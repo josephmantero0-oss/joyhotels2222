@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Housekeeping Portal - {{ hotel_name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #f8fafc;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #D4AF37;
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        .rooms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .room-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid #334155;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .room-card.available {
+            border-color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .room-card.dirty {
+            border-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .room-card.cleaning {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .room-card.occupied {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .room-number {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #f8fafc;
+        }
+
+        .room-type {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin: 5px 0;
+        }
+
+        .room-status {
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border-radius: 20px;
+            display: inline-block;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+
+        .available .room-status {
+            background: #10b981;
+            color: white;
+        }
+
+        .dirty .room-status {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .cleaning .room-status {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .occupied .room-status {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 6px 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .btn-clean {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-dirty {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .btn:hover {
+            opacity: 0.8;
+            transform: scale(1.05);
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #10b981;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            display: block;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🧹 {{ hotel_name }}</h1>
+        <p>Housekeeping Status Board</p>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-dot" style="background: #10b981;"></div> Available
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: #f59e0b;"></div> Needs Cleaning
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: #3b82f6;"></div> Being Cleaned
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: #ef4444;"></div> Occupied
+        </div>
+    </div>
+
+    <div class="rooms-grid">
+        {% for room in rooms %}
+        <div class="room-card {{ room.status }}" id="room-{{ room.id }}">
+            <div class="room-number">{{ room.id }}</div>
+            <div class="room-type">{{ room.type }}</div>
+            <div class="room-status">{{ room.status | capitalize }}</div>
+            {% if room.status != 'occupied' %}
+            <div class="btn-group">
+                {% if room.status == 'dirty' %}
+                <button class="btn btn-clean" onclick="updateStatus('{{ room.id }}', 'cleaning')">🧹 Start
+                    Cleaning</button>
+                {% elif room.status == 'cleaning' %}
+                <button class="btn btn-clean" onclick="updateStatus('{{ room.id }}', 'available')">✅ Done</button>
+                {% elif room.status == 'available' %}
+                <button class="btn btn-dirty" onclick="updateStatus('{{ room.id }}', 'dirty')">⚠️ Mark Dirty</button>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="toast" id="toast">Status Updated!</div>
+
+    <script>
+        async function updateStatus(roomId, status) {
+            try {
+                const res = await fetch('/hk/{{ token }}/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ room_id: roomId, status: status })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Status Updated!');
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    showToast('Error: ' + data.message);
+                }
+            } catch (e) {
+                showToast('Connection Error');
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+    </script>
+</body>
+
+</html>

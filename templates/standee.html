@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reception Standee - {{ hotel_name }}</title>
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0f172a;
+            --gold: #d4af37;
+            --bg: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .controls {
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1rem;
+            transition: all 0.2s;
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            background: #1e293b;
+        }
+
+        .standee-container {
+            background: white;
+            width: 210mm;
+            /* A4 width */
+            height: 297mm;
+            /* A4 height */
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top decorative border */
+        .standee-header {
+            background: var(--primary);
+            color: var(--gold);
+            padding: 4rem 2rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .standee-header::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background: white;
+            border-radius: 50% 50% 0 0;
+        }
+
+        .hotel-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 4rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+            text-transform: capitalize;
+        }
+
+        .stars {
+            color: var(--gold);
+            font-size: 1.5rem;
+            letter-spacing: 0.2rem;
+            margin-bottom: 1rem;
+        }
+
+        .standee-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 4rem;
+            text-align: center;
+            background: url('data:image/svg+xml;utf8,<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><circle cx="2" cy="2" r="2" fill="%23f1f5f9"/></svg>') repeat;
+        }
+
+        .instruction-title {
+            font-size: 2.5rem;
+            color: var(--primary);
+            font-weight: 700;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .instruction-sub {
+            font-size: 1.25rem;
+            color: #64748b;
+            margin-bottom: 4rem;
+            max-width: 80%;
+            line-height: 1.6;
+        }
+
+        .qr-wrapper {
+            background: white;
+            padding: 2rem;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+            border: 2px solid #f1f5f9;
+            position: relative;
+            margin-bottom: 4rem;
+        }
+
+        /* Decorative corners for QR */
+        .qr-wrapper::before,
+        .qr-wrapper::after,
+        .qr-wrapper .corner-bl,
+        .qr-wrapper .corner-br {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 4px solid var(--gold);
+            border-radius: 8px;
+        }
+
+        .qr-wrapper::before {
+            top: -10px;
+            left: -10px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .qr-wrapper::after {
+            top: -10px;
+            right: -10px;
+            border-left: none;
+            border-bottom: none;
+        }
+
+        .qr-wrapper .corner-bl {
+            bottom: -10px;
+            left: -10px;
+            border-right: none;
+            border-top: none;
+        }
+
+        .qr-wrapper .corner-br {
+            bottom: -10px;
+            right: -10px;
+            border-left: none;
+            border-top: none;
+        }
+
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #qrcode img {
+            width: 300px;
+            height: 300px;
+        }
+
+        .steps {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            width: 100%;
+            margin-top: auto;
+            margin-bottom: 2rem;
+        }
+
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .step-icon {
+            width: 60px;
+            height: 60px;
+            background: var(--primary);
+            color: var(--gold);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .step-text {
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .standee-footer {
+            background: var(--primary);
+            color: white;
+            text-align: center;
+            padding: 2rem;
+            font-size: 1.1rem;
+            position: relative;
+        }
+
+        .standee-footer::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 50% 50% 0 0;
+            z-index: -1;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+                display: block;
+            }
+
+            .controls {
+                display: none !important;
+            }
+
+            .standee-container {
+                box-shadow: none;
+                width: 100%;
+                height: 100vh;
+            }
+
+            @page {
+                size: A4 portrait;
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="controls">
+        <button class="btn" onclick="window.print()">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z">
+                </path>
+            </svg>
+            Print Standee
+        </button>
+        <button class="btn" onclick="window.close()"
+            style="background: white; color: var(--primary); border: 1px solid #cbd5e1;">
+            Close
+        </button>
+    </div>
+
+    <div class="standee-container">
+        <div class="standee-header">
+            <div class="stars">★★★★★</div>
+            <h1 class="hotel-name">{{ hotel_name }}</h1>
+        </div>
+
+        <div class="standee-body">
+            <h2 class="instruction-title">Fast & Easy Check-In</h2>
+            <p class="instruction-sub">Skip the line at the reception. Scan the QR code below to complete your check-in
+                instantly from your phone.</p>
+
+            <div class="qr-wrapper">
+                <div class="corner-bl"></div>
+                <div class="corner-br"></div>
+                <div id="qrcode"></div>
+            </div>
+
+            <div class="steps">
+                <div class="step">
+                    <div class="step-icon">1</div>
+                    <div class="step-text">Connect to WiFi</div>
+                </div>
+                <div class="step">
+                    <div class="step-icon">2</div>
+                    <div class="step-text">Scan QR Code</div>
+                </div>
+                <div class="step">
+                    <div class="step-icon">3</div>
+                    <div class="step-text">Fill Details</div>
+                </div>
+                <div class="step">
+                    <div class="step-icon">4</div>
+                    <div class="step-text">Get Your Key</div>
+                </div>
+            </div>
+
+            <div class="standee-footer">
+                Powered by JoyHotels
+            </div>
+        </div>
+
+        <!-- QR Code JS -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const portalUrl = "{{ portal_url }}";
+
+                const qrCode = new QRCode(document.getElementById("qrcode"), {
+                    text: portalUrl,
+                    width: 300,
+                    height: 300,
+                    colorDark: "#0f172a",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+
+                // Wait a moment for QR to render, then open print dialog automatically if desired
+                setTimeout(() => { window.print(); }, 1500);
+            });
+        </script>
+</body>
+
+</html>

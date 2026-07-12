@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reservations Calendar - JoyHotels</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+    <style>
+        :root {
+            --bg-body: #0f172a;
+            --bg-card: #1e293b;
+            --bg-sidebar: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --primary-color: #6366f1;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --border-color: #334155;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Layout */
+        .top-header {
+            background: var(--bg-card);
+            border-bottom: 0px solid var(--border-color);
+            /* Removed border for seamless look */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .nav-btn:hover,
+        .nav-btn.active {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary-color);
+        }
+
+        .control-bar {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        @media (max-width: 1024px) {
+            .control-bar {
+                flex-direction: column;
+                gap: 1.5rem;
+                align-items: stretch;
+            }
+
+            .top-header {
+                padding: 1rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .header-nav {
+                width: 100%;
+                overflow-x: auto;
+                padding-bottom: 5px;
+            }
+        }
+
+        .brand h2 {
+            margin: 0 0 2rem 0;
+            font-size: 1.5rem;
+            letter-spacing: -0.5px;
+            color: var(--primary-color);
+        }
+
+        .filter-section {
+            margin-bottom: 2.5rem;
+        }
+
+        .filter-section h3 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 0.8rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* Main Content */
+        .main-content {
+            padding: 2rem;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #calendar-wrapper {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 20px;
+            height: 100%;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        /* FullCalendar Customization */
+        .fc {
+            --fc-border-color: var(--border-color);
+            --fc-page-bg-color: var(--bg-card);
+            --fc-neutral-bg-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .fc-theme-standard td,
+        .fc-theme-standard th {
+            border-color: var(--border-color);
+        }
+
+        .fc-col-header-cell {
+            padding: 10px 0;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .fc-daygrid-day-number {
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .fc-toolbar-title {
+            font-size: 1.25rem !important;
+        }
+
+        .fc-button-primary {
+            background-color: var(--primary-color) !important;
+            border: none !important;
+            border-radius: 6px !important;
+            text-transform: capitalize;
+            padding: 6px 16px !important;
+        }
+
+        .fc-button-active {
+            background-color: #4f46e5 !important;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: none;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--text-primary);
+            color: var(--text-primary);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            padding: 2.5rem;
+            border-radius: 16px;
+            width: 450px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: white;
+            box-sizing: border-box;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .modal-actions .btn {
+            flex: 1;
+        }
+
+        /* Toggle */
+        .toggle-option {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            gap: 10px;
+        }
+
+        .toggle-option input {
+            display: none;
+        }
+
+        .toggle-slider {
+            width: 36px;
+            height: 20px;
+            background: var(--border-color);
+            border-radius: 20px;
+            position: relative;
+            transition: 0.3s;
+        }
+
+        .toggle-slider:before {
+            content: "";
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: 0.3s;
+        }
+
+        input:checked+.toggle-slider {
+            background: var(--primary-color);
+        }
+
+        input:checked+.toggle-slider:before {
+            transform: translateX(16px);
+        }
+
+        .toggle-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+
+<body data-theme="dark">
+    <!-- Top Header (Standard Component) -->
+    <div class="top-header"
+        style="background: var(--bg-card); border-bottom: 1px solid var(--border-color); padding: 0.75rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100;">
+        <div style="display: flex; align-items: center; gap: 2rem;">
+            <div class="logo">
+                <a href="/dashboard"
+                    style="text-decoration: none; display: flex; align-items: center; gap: 10px; color: var(--text-primary); font-weight: 700; font-size: 1.2rem;">
+                    <span>📅 JoyHotels</span>
+                </a>
+            </div>
+            <div class="header-nav" style="display: flex; gap: 0.5rem;">
+                <button class="nav-btn" onclick="window.location.href='/dashboard'">Dashboard</button>
+                {% if role in ['owner', 'admin'] %}
+                <button class="nav-btn" onclick="window.location.href='/dashboard#financial'">Financials</button>
+                {% endif %}
+                <button class="nav-btn active">Calendar</button>
+                {% if role in ['owner', 'admin'] %}
+                <button class="nav-btn" onclick="window.location.href='/settings'">Settings</button>
+                {% endif %}
+            </div>
+        </div>
+        <div class="header-right" style="display: flex; align-items: center; gap: 1rem;">
+            <span>👤 {{ session.username|title }}</span>
+            <button class="btn btn-outline" onclick="window.location.href='/logout'"
+                style="padding: 6px 12px; font-size: 0.85rem;">Logout</button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container"
+        style="padding: 2rem; display: flex; flex-direction: column; height: calc(100vh - 70px);">
+
+        <!-- Control Bar (New Home for Sidebar Items) -->
+        <div class="control-bar"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; background: var(--bg-card); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
+            <div style="display: flex; align-items: center; gap: 2rem;">
+                <!-- Legend -->
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <span
+                        style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Legend:</span>
+                    <div class="legend-item" style="margin:0;"><span class="dot" style="background: #3b82f6;"></span>
+                        Reserved</div>
+                    <div class="legend-item" style="margin:0;"><span class="dot" style="background: #f59e0b;"></span>
+                        Active</div>
+                    <div class="legend-item" style="margin:0;"><span class="dot" style="background: #10b981;"></span>
+                        Completed</div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <label class="toggle-option" style="margin:0;">
+                    <input type="checkbox" id="showHistory" onchange="toggleHistory(this)">
+                    <span class="toggle-slider" style="height: 24px; width: 44px;"></span>
+                    <span class="toggle-label">Show History</span>
+                </label>
+                <button class="btn btn-primary"
+                    onclick="document.getElementById('reservationModal').classList.add('show')">
+                    + New Reservation
+                </button>
+            </div>
+        </div>
+
+        <!-- Calendar Area -->
+        <div id="calendar-wrapper" style="flex: 1; min-height: 0;">
+            <div id="calendar"></div>
+        </div>
+    </div>
+
+    <!-- New Reservation Modal -->
+    <div id="reservationModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>New Reservation</h2>
+                <button type="button" class="close-btn"
+                    onclick="document.getElementById('reservationModal').classList.remove('show')">&times;</button>
+            </div>
+            <form id="resForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Guest Name</label>
+                        <input type="text" name="guest_name" class="form-control" required placeholder="John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="tel" name="phone" class="form-control" required placeholder="+91...">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Room Number</label>
+                    <select name="room_id" id="roomSelect" class="form-control" required>
+                        <!-- Loaded dynamically -->
+                    </select>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Check-in</label>
+                        <input type="date" name="checkin_date" id="checkinDate" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Check-out</label>
+                        <input type="date" name="checkout_date" id="checkoutDate" class="form-control" required>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline"
+                        onclick="document.getElementById('reservationModal').classList.remove('show')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Confirm Booking</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var calendarEl = document.getElementById('calendar');
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                height: '100%', // Fills the wrapper
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,dayGridWeek,listMonth'
+                },
+                selectable: true,
+                dayMaxEvents: true, // +more link when too many events
+                views: {
+                    dayGrid: {
+                        dayMaxEvents: 3 // adjust to 3 for cleaner look
+                    }
+                },
+                select: function (info) {
+                    document.getElementById('reservationModal').classList.add('show');
+                    document.getElementById('checkinDate').value = info.startStr;
+                    // FullCalendar selects exclusive end date, so for single day click it might be next day
+                    // If multiple days selected, keep as is.
+                    // Simple logic:
+                    let endDate = new Date(info.endStr);
+                    endDate.setDate(endDate.getDate() - 1); // Subtract 1 day for intuitive inclusive end date in form
+                    document.getElementById('checkoutDate').value = endDate.toISOString().split('T')[0];
+                    if (document.getElementById('checkoutDate').value < document.getElementById('checkinDate').value) {
+                        document.getElementById('checkoutDate').value = info.endStr; // Fallback
+                    }
+                },
+                events: '/api/reservations',
+                eventClick: function (info) {
+                    if (info.event.extendedProps.status === 'cancelled') return;
+                    alert(`Reservation Details:\nGuest: ${info.event.title}\nDates: ${info.event.start.toLocaleDateString()} - ${info.event.end ? info.event.end.toLocaleDateString() : 'N/A'}`);
+                },
+                eventContent: function (arg) {
+                    let italic = arg.event.extendedProps.status === 'cancelled' ? 'font-style:italic;' : '';
+                    return { html: `<div style="font-size:0.85rem; padding:2px; ${italic}"><b>${arg.event.extendedProps.resourceId}</b>: ${arg.event.title}</div>` }
+                }
+            });
+
+            calendar.render();
+            window.calendarRef = calendar;
+
+            // Load Rooms
+            fetch('/api/rooms').then(r => r.json()).then(rooms => {
+                const sel = document.getElementById('roomSelect');
+                sel.innerHTML = '';
+                rooms.forEach(room => {
+                    sel.innerHTML += `<option value="${room.room_id}">${room.room_id} (${room.room_type})</option>`;
+                });
+            });
+
+            // Form Submit
+            document.getElementById('resForm').onsubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
+
+                // For date input usage, we might need to adjust back to what backend expects (exclusive end?)
+                // Usually backend expects inclusive or exclusive. My backend code uses these directly.
+                // If I subtracted a day for display, I might need to add it back if backend treats end as exclusive.
+                // Let's assume backend logic: "date(checkout) >= ?" check matches inclusive.
+                // Standard: checkin 1st, checkout 2nd = 1 night.
+
+                try {
+                    const res = await fetch('/api/reserve', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                        // Custom toast or alert?
+                        const btn = e.submitter;
+                        const originalText = btn.innerText;
+                        btn.innerText = 'Matched!';
+                        btn.style.background = 'var(--success-color)';
+                        setTimeout(() => {
+                            alert('Reservation Successful!');
+                            btn.innerText = originalText;
+                            btn.style.background = '';
+                            calendar.refetchEvents();
+                            document.getElementById('reservationModal').classList.remove('show');
+                            e.target.reset();
+                        }, 500);
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                } catch (err) { console.error(err); }
+            };
+        });
+
+        function toggleHistory(checkbox) {
+            if (!window.calendarRef) return;
+            const source = checkbox.checked ? '/api/reservations?history=true' : '/api/reservations';
+            window.calendarRef.getEventSources().forEach(s => s.remove());
+            window.calendarRef.addEventSource(source);
+        }
+    </script>
+</body>
+
+</html>

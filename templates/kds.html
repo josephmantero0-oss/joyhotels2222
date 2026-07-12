@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitchen Display - {{ hotel_name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --gold: #D4AF37;
+            --success: #10b981;
+            --border: rgba(212, 175, 55, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        .clock {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .kds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .order-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.5rem;
+        }
+
+        .table-id {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        .order-time {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .item-list {
+            flex: 1;
+            margin-bottom: 1.5rem;
+        }
+
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+        }
+
+        .item-info {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .item-qty {
+            background: var(--gold);
+            color: black;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .ready-btn {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .ready-btn:hover {
+            opacity: 0.9;
+            transform: scale(1.02);
+        }
+
+        .ready-btn:active {
+            transform: scale(0.98);
+        }
+
+        .no-orders {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 4rem;
+            color: var(--text-secondary);
+            font-size: 1.25rem;
+        }
+
+        .timer {
+            font-size: 0.75rem;
+            margin-top: 4px;
+            color: #ef4444;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="logo">👨‍🍳 KITCHEN DISPLAY: {{ hotel_name }}</div>
+        <div class="clock" id="liveClock">00:00:00</div>
+    </header>
+
+    <div id="kdsGrid" class="kds-grid">
+        <!-- Orders will be injected here -->
+        <div class="no-orders">Waiting for new orders...</div>
+    </div>
+
+    <script>
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('liveClock').innerText = now.toLocaleTimeString();
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        async function fetchOrders() {
+            try {
+                const response = await fetch('/api/restaurant/kds/orders');
+                const orders = await response.json();
+                renderOrders(orders);
+            } catch (e) {
+                console.error('KDS Fetch Error:', e);
+            }
+        }
+
+        function renderOrders(orders) {
+            const grid = document.getElementById('kdsGrid');
+            if (orders.length === 0) {
+                grid.innerHTML = '<div class="no-orders">Waiting for new orders...</div>';
+                return;
+            }
+
+            grid.innerHTML = orders.map(order => `
+                <div class="order-card" id="item-${order.id}">
+                    <div class="order-header">
+                        <span class="table-id">Table ${order.table_id}</span>
+                        <span class="order-time">${order.time.split(' ')[1]}</span>
+                    </div>
+                    <div class="item-list">
+                        <div class="item-row">
+                            <span class="item-info">${order.item_name}</span>
+                            <span class="item-qty">x${order.quantity}</span>
+                        </div>
+                    </div>
+                    <button class="ready-btn" onclick="markReady(${order.id})">DONE / READY</button>
+                    <div class="timer" data-start="${order.time}">Wait: 0m</div>
+                </div>
+            `).join('');
+
+            updateTimers();
+        }
+
+        async function markReady(itemId) {
+            try {
+                const response = await fetch(`/api/restaurant/kds/ready/${itemId}`, { method: 'POST' });
+                const result = await response.json();
+                if (result.success) {
+                    const card = document.getElementById(`item-${itemId}`);
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.9)';
+                    setTimeout(() => fetchOrders(), 300);
+                }
+            } catch (e) {
+                console.error('KDS Ready Error:', e);
+            }
+        }
+
+        function updateTimers() {
+            const timers = document.querySelectorAll('.timer');
+            timers.forEach(t => {
+                const start = new Date(t.dataset.start);
+                const diff = Math.floor((new Date() - start) / 60000);
+                t.innerText = `Wait: ${diff}m`;
+            });
+        }
+
+        setInterval(fetchOrders, 5000); // Pool every 5 seconds
+        setInterval(updateTimers, 60000); // Update timers every minute
+        fetchOrders();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,26 @@
+# Python virtual environment
+.venv/
+Scripts/
+Lib/
+Include/
+
+# Cache directories
+__pycache__/
+.pytest_cache/
+
+# Databases and Backups
+*.db
+*.sqlite
+*.sqlite3
+*.db.backup_delete
+*.db.pre_restore
+temp_backup/
+temp_backup_29/
+
+# Environment Variables (Security)
+.env
+secret.key
+
+# OS specific files
+.DS_Store
+Thumbs.db

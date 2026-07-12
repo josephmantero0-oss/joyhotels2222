@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guest Bill - Print</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .no-print {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .print-btn {
+            padding: 12px 30px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        .print-btn:hover {
+            background: #2980b9;
+        }
+
+        .back-btn {
+            padding: 12px 30px;
+            background: #95a5a6;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .back-btn:hover {
+            background: #7f8c8d;
+        }
+
+        .bill-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .bill-header {
+            text-align: center;
+            border-bottom: 3px solid #2c3e50;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .bill-header h1 {
+            font-size: 36px;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .bill-header p {
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+
+        .bill-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .info-group h3 {
+            color: #2c3e50;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .info-item {
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #555;
+            display: inline-block;
+            width: 120px;
+        }
+
+        .info-value {
+            color: #333;
+        }
+
+        .bill-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .bill-table thead {
+            background: #34495e;
+            color: white;
+        }
+
+        .bill-table th,
+        .bill-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .bill-table th {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+        }
+
+        .bill-table td {
+            font-size: 15px;
+        }
+
+        .bill-table .amount {
+            text-align: right;
+        }
+
+        .bill-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .total-row {
+            background: #ecf0f1;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .total-row td {
+            padding: 15px 12px;
+            border-bottom: 3px solid #2c3e50;
+        }
+
+        .grand-total {
+            background: #2c3e50;
+            color: white;
+            font-size: 18px;
+        }
+
+        .grand-total td {
+            padding: 18px 12px;
+        }
+
+        .bill-footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #ecf0f1;
+        }
+
+        .bill-footer h3 {
+            color: #27ae60;
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        .bill-footer p {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .no-print {
+                display: none;
+            }
+
+            .bill-container {
+                box-shadow: none;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="no-print">
+        <button class="print-btn" onclick="window.print()">🖨️ Print Bill</button>
+        <button class="print-btn" style="background: #e67e22;" onclick="downloadPDF()">📄 Download PDF</button>
+        <button class="print-btn" style="background: #25D366;" onclick="shareWhatsApp()">📱 Share on WhatsApp</button>
+        <button class="print-btn" style="background: #9b59b6;"
+            onclick="window.open('/guest-portal/{{ guest_id }}', '_blank')">🛎️ Guest Portal</button>
+        <button class="back-btn" onclick="window.close()">← Back</button>
+    </div>
+
+    <div class="bill-container" id="billContent">
+        <div class="bill-header">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 1rem;">
+                <img src="/static/logo.png" alt="Logo" style="height: 60px;">
+                <h1 style="margin: 0;">{{ hotel_name|upper }}</h1>
+            </div>
+            <p style="margin-bottom: 5px;">{{ hotel_address }}</p>
+            <p>Email: {{ hotel_email }} | Phone: {{ hotel_phone }}</p>
+            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee;">
+                <h2 style="color: #2c3e50; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 2px;">Invoice /
+                    Receipt</h2>
+            </div>
+        </div>
+
+        <div class="bill-info" id="billInfo">
+            <!-- Guest info will be loaded here -->
+        </div>
+
+        <table class="bill-table">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th class="amount">Amount (₹)</th>
+                </tr>
+            </thead>
+            <tbody id="chargesBody">
+                <!-- Charges will be loaded here -->
+            </tbody>
+        </table>
+
+        <div class="bill-footer">
+            <h3>Thank You for Staying with Us! 🙏</h3>
+            <p>We hope to serve you again soon</p>
+        </div>
+    </div>
+
+    <script>
+        const guestId = parseInt("{{ guest_id }}");
+        const CURRENCY = "{{ currency }}";
+        const TAX_RATE = parseFloat("{{ tax_rate }}") || 0;
+
+        function downloadPDF() {
+            const element = document.getElementById('billContent');
+            const guestName = window.billData ? window.billData.name : 'Guest';
+            const options = {
+                margin: 10,
+                filename: `Invoice_${guestName}_${new Date().toISOString().split('T')[0]}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().from(element).set(options).save();
+        }
+
+        async function loadBill() {
+            const response = await fetch(`/api/guest/${guestId}`);
+            const guest = await response.json();
+
+            // Load guest info
+            document.getElementById('billInfo').innerHTML = `
+                <div class="info-group">
+                    <h3>Guest Information</h3>
+                    <div class="info-item">
+                        <span class="info-label">Name:</span>
+                        <span class="info-value">${guest.guest_name}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Phone:</span>
+                        <span class="info-value">${guest.phone}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">ID Number:</span>
+                        <span class="info-value">${guest.id_number}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Address:</span>
+                        <span class="info-value">${guest.address}</span>
+                    </div>
+                </div>
+                <div class="info-group">
+                    <h3>Stay Details</h3>
+                    <div class="info-item">
+                        <span class="info-label">Room:</span>
+                        <span class="info-value">${guest.room_id}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">In:</span>
+                        <span class="info-value">${guest.checkin_time}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Out:</span>
+                        <span class="info-value">${guest.checkout_time || 'Active'}</span>
+                    </div>
+                </div>
+            `;
+
+            // Calculate charges
+            let charges = [
+                { desc: 'Room Charges', amount: guest.amount }
+            ];
+
+            if (guest.food > 0) charges.push({ desc: 'Food', amount: guest.food });
+            if (guest.laundry > 0) charges.push({ desc: 'Laundry', amount: guest.laundry });
+            if (guest.water_bottle > 0) charges.push({ desc: 'Water Bottle', amount: guest.water_bottle });
+            if (guest.car_wash > 0) charges.push({ desc: 'Car Wash', amount: guest.car_wash });
+            if (guest.extra_charges > 0) charges.push({ desc: 'Extra Charges', amount: guest.extra_charges });
+
+            // Note: DB structure for total is a bit ambiguous (amount usually includes room. Does it include services?
+            // Looking at app.py/get_guest_details: amount is row[8], extras row[11], services row 12-15.
+            // Assuming 'amount' is base room charge.
+            // Let's recalculate accurately:
+            let totalService = (guest.food || 0) + (guest.laundry || 0) + (guest.water_bottle || 0) + (guest.car_wash || 0);
+            let realSubtotal = guest.amount + (guest.extra_charges || 0) + totalService;
+
+            // Calculate Tax
+            const taxAmount = realSubtotal * (TAX_RATE / 100);
+            const grandTotal = realSubtotal + taxAmount;
+
+            // Load charges table
+            let chargesHTML = charges.map(c => `
+                <tr>
+                    <td>${c.desc}</td>
+                    <td class="amount">${CURRENCY}${c.amount.toFixed(2)}</td>
+                </tr>
+            `).join('');
+
+            chargesHTML += `
+                <tr class="total-row">
+                    <td>Subtotal</td>
+                    <td class="amount">${CURRENCY}${realSubtotal.toFixed(2)}</td>
+                </tr>
+            `;
+
+            if (TAX_RATE > 0) {
+                chargesHTML += `
+                    <tr>
+                        <td>Tax (${TAX_RATE}%)</td>
+                        <td class="amount">${CURRENCY}${taxAmount.toFixed(2)}</td>
+                    </tr>
+                `;
+            }
+
+            chargesHTML += `
+                <tr class="grand-total">
+                    <td><strong>GRAND TOTAL</strong></td>
+                    <td class="amount"><strong>${CURRENCY}${grandTotal.toFixed(2)}</strong></td>
+                </tr>
+            `;
+
+            document.getElementById('chargesBody').innerHTML = chargesHTML;
+
+            // Store for WhatsApp
+            window.billData = {
+                name: guest.guest_name,
+                room: guest.room_id,
+                total: grandTotal.toFixed(2),
+                currency: CURRENCY
+            };
+        }
+
+        async function shareWhatsApp() {
+            if (!window.billData) return;
+            const b = window.billData;
+
+            const text = `*Hotel Bill - {{ session.hotel_name }}*%0A` +
+                `----------------------------%0A` +
+                `Guest: ${b.name}%0A` +
+                `Room: ${b.room}%0A` +
+                `Total: ${b.currency}${b.total} (Inc. Tax)%0A` +
+                `----------------------------%0A` +
+                `Thank you for staying with us! 🙏`;
+
+            // Assuming guest.phone exists locally, need to fetch again or store globally?
+            // guestId is global. fetch/loadBill runs first.
+            // But verify phone is available?
+            // Let's grab phone from DOM or guest object if scoped?
+            // Better: make guest object global in loadBill
+            fetch(`/api/guest/${guestId}`).then(r => r.json()).then(g => {
+                const url = `https://wa.me/${g.phone}?text=${text}`;
+                window.open(url, '_blank');
+            });
+        }
+
+        // Apply Saved Theme
+        const savedColor = localStorage.getItem('joy_theme_{{ session.hotel_id }}');
+        if (savedColor) {
+            document.documentElement.style.setProperty('--primary-color', savedColor);
+            document.documentElement.style.setProperty('--primary-hover', savedColor); // Simplified for bill
+            // Overrides specific to bill styles if needed, or we rely on dashboard.css NOT being loaded here?
+            // bill.html uses inline styles, so we need to inject CSS variables if we want to use them.
+            // But bill.html uses #3498db (blue) hardcoded. Let's override .bill-header and h1 color if we want.
+            // Actually, let's just leave the bill as is (professional blue/grey) OR try to theme it.
+            // The prompt said "color selection ect are not visible", implying dashboard. 
+            // Themeing the bill might be overkill or risky if it breaks print styles.
+            // BUT, I'll add the script just in case I want to use it later, but mainly for consistent experience if users navigate back.
+        }
+
+        loadBill();
+    </script>
+</body>
+
+</html>

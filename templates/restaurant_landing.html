@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JoyHotels - Fast & Smart Restaurant Management POS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=mobile_menu_fix_4">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0f172a;
+            --accent: #ca8a04;
+            /* Gold */
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+        }
+
+        .showcase-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: rgba(202, 138, 4, 0.1);
+            color: var(--accent);
+            border-radius: 99px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 1rem;
+        }
+
+        .hero-banner {
+            padding: 8rem 0 4rem;
+            text-align: center;
+            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%);
+        }
+
+        .hero-banner h1 {
+            font-size: 3.5rem;
+            line-height: 1.25;
+            margin-bottom: 2rem;
+            background: linear-gradient(to right, #f5f2f2, var(--accent));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-banner p {
+            font-size: 1.25rem;
+            color: var(--text-dim);
+            max-width: 800px;
+            margin: 0 auto 3rem;
+        }
+
+        .feature-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 3rem;
+            margin-top: 6rem;
+        }
+
+        .feature-card {
+            background: #1e293b;
+            padding: 2.5rem;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: var(--accent);
+        }
+
+        .feature-card icon {
+            font-size: 2.5rem;
+            display: block;
+            margin-bottom: 1.5rem;
+        }
+
+        .cta-section {
+            padding: 6rem 0;
+            background: var(--accent);
+            color: #000;
+            text-align: center;
+        }
+
+        .cta-section h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .showcase-section {
+            margin-bottom: 8rem;
+        }
+
+        .showcase-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 5rem;
+            align-items: center;
+        }
+
+        .btn-dark {
+            background: #000;
+            color: #fff;
+            padding: 1rem 2.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 2rem;
+        }
+
+        /* Custom Cursor */
+        body {
+            cursor: none;
+        }
+
+        .custom-cursor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--accent, #ca8a04);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), height 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .custom-cursor-dot {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 6px;
+            height: 6px;
+            background: var(--accent, #ca8a04);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10000;
+            transform: translate(-50%, -50%);
+            transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Menu Effects */
+        .nav-links a {
+            position: relative;
+            transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--accent, #ca8a04);
+            transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        .nav-links a.btn-gold::after {
+            display: none;
+        }
+
+        /* Dribbble Easing and Load Reveal Animations */
+        .reveal-mask {
+            display: inline-block;
+            overflow: hidden;
+            vertical-align: top;
+        }
+
+        .reveal-mask-inner {
+            display: block;
+            transform: translateY(110%);
+            animation: slideUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .scale-fade-in {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: scaleFadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes slideUp {
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes scaleFadeIn {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .delay-100 {
+            animation-delay: 0.1s;
+        }
+
+        .delay-200 {
+            animation-delay: 0.2s;
+        }
+
+        .delay-300 {
+            animation-delay: 0.3s;
+        }
+
+        .delay-400 {
+            animation-delay: 0.4s;
+        }
+
+        .delay-500 {
+            animation-delay: 0.5s;
+        }
+
+        /* 3D Spinning Carousel */
+        .infinite-carousel {
+            position: relative;
+            width: 100%;
+            height: 180px;
+            margin: 4rem 0;
+            background: rgba(202, 138, 4, 0.05); /* restaurant accent */
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            perspective: 1200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+            -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.5s ease;
+        }
+
+        .infinite-carousel:hover {
+            transform: scale(1.15);
+            z-index: 20;
+            box-shadow: 0 20px 60px rgba(202, 138, 4, 0.15);
+        }
+
+        .infinite-carousel-track {
+            position: absolute;
+            width: 0;
+            height: 100%;
+            transform-style: preserve-3d;
+            animation: spinCarousel 30s linear infinite;
+        }
+
+        .carousel-item {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-main, #f8fafc);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            backface-visibility: hidden;
+        }
+
+        .carousel-item span {
+            color: var(--accent, #ca8a04);
+            font-size: 1.5rem;
+        }
+
+        @keyframes spinCarousel {
+            from { transform: translateZ(calc(var(--radius) * -1)) rotateY(0deg); }
+            to { transform: translateZ(calc(var(--radius) * -1)) rotateY(-360deg); }
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+            JoyHotels <span
+                style="font-size: 0.6rem; background: var(--accent); color: #000; padding: 2px 6px; border-radius: 4px; margin-left: 5px;">RESTAURANT</span>
+        </div>
+        <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
+        <div class="nav-links" id="navLinks">
+            <a href="{{ url_for('index') }}">Hotel Version</a>
+            <a href="{{ url_for('pricing') }}">Pricing</a>
+            <a href="{{ url_for('login') }}">Login</a>
+            <a href="{{ url_for('signup') }}" class="btn-gold">Quick Setup</a>
+        </div>
+    </nav>
+
+    <header class="hero-banner">
+        <div class="container">
+            <div class="reveal-mask" style="margin-bottom: 1.5rem;">
+                <span class="showcase-badge reveal-mask-inner" style="margin-bottom: 0;">The Ultimate Restaurant POS</span>
+            </div>
+            <div class="reveal-mask">
+                <h1 class="reveal-mask-inner delay-100" style="margin-bottom: 2rem; padding-bottom: 0.2rem; -webkit-text-fill-color: transparent;">Serve Faster. Earn More. <br>Manage Better.</h1>
+            </div>
+            <div class="reveal-mask">
+                <p class="reveal-mask-inner delay-200" style="margin-bottom: 3rem;">From fast-paced billing to real-time kitchen tracking, JoyHotels Restaurant Edition is built to handle your busiest hours without breaking a sweat.</p>
+            </div>
+
+            <div class="reveal-mask" style="display: flex; justify-content: center; margin-bottom: 4rem;">
+                <div class="reveal-mask-inner delay-300" style="display: flex; gap: 1rem;">
+                    <a href="{{ url_for('signup') }}" class="btn-gold" style="margin-top: 0;">Sign Up in 2 Minutes</a>
+                    <a href="#features" class="btn-outline" style="margin-top: 0;">See Features</a>
+                </div>
+            </div>
+
+            <div class="hero-img-container shadow-lg scale-fade-in delay-500">
+                <img src="{{ url_for('static', filename='res_previews/hero_dashboard.png') }}" class="hero-img"
+                    alt="JoyHotels Restaurant Management Interface">
+            </div>
+        </div>
+    </header>
+
+    <!-- Infinite Carousel -->
+    <div class="infinite-carousel">
+        <div class="infinite-carousel-track">
+            <!-- First set -->
+            <div class="carousel-item"><span>✦</span> 3-Second Checkout</div>
+            <div class="carousel-item"><span>✦</span> Live KDS Sync</div>
+            <div class="carousel-item"><span>✦</span> Smart Inventory Control</div>
+            <div class="carousel-item"><span>✦</span> WhatsApp PDF Bills</div>
+            <div class="carousel-item"><span>✦</span> Automated Settlement</div>
+            <div class="carousel-item"><span>✦</span> Menu Engineering Logic</div>
+            <!-- Duplicated for seamless scrolling -->
+            <div class="carousel-item"><span>✦</span> 3-Second Checkout</div>
+            <div class="carousel-item"><span>✦</span> Live KDS Sync</div>
+            <div class="carousel-item"><span>✦</span> Smart Inventory Control</div>
+            <div class="carousel-item"><span>✦</span> WhatsApp PDF Bills</div>
+            <div class="carousel-item"><span>✦</span> Automated Settlement</div>
+            <div class="carousel-item"><span>✦</span> Menu Engineering Logic</div>
+        </div>
+    </div>
+
+    <section id="features" class="features" style="background: #0f172a; padding: 6rem 0;">
+        <div class="container">
+            <div style="text-align: center; margin-bottom: 7rem;">
+                <span class="section-tag">Elite Performance</span>
+                <h2 style="font-size: 3rem;">Built for Modern Dining</h2>
+            </div>
+
+            <div class="showcase-section">
+                <div class="showcase-grid">
+                    <div>
+                        <span class="showcase-badge">Lightning Fast POS</span>
+                        <h3 style="font-size: 2.25rem; margin-bottom: 1.5rem; color: var(--gold);">Billing at the Speed
+                            of Light</h3>
+                        <p style="color: var(--text-dim); line-height: 1.8; margin-bottom: 2rem;">Tired of slow billing?
+                            Our <b>"Item Code"</b> lookup system allows your staff to generate bills in seconds. Just
+                            type 101, 102, and hit Enter. It's that simple.</p>
+                        <div class="feature-item">
+                            <icon>⚡</icon>
+                            <div>
+                                <h4>3-Second Checkout</h4>
+                                <p>Reduce wait times and keep your customers happy with ultra-fast bill generation.</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <icon>🏷️</icon>
+                            <div>
+                                <h4>Custom Item Codes</h4>
+                                <p>Set your own shortcodes for your most popular dishes for instant lookups.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <img src="{{ url_for('static', filename='res_previews/pos_billing.png') }}"
+                            class="showcase-image shadow-2xl" alt="POS Billing Engine Interface">
+                    </div>
+                </div>
+            </div>
+
+            <div class="showcase-section">
+                <div class="showcase-grid">
+                    <div style="order: 2;">
+                        <span class="showcase-badge">Kitchen Display System</span>
+                        <h3 style="font-size: 2.25rem; margin-bottom: 1.5rem; color: var(--gold);">Zero Communication
+                            Errors</h3>
+                        <p style="color: var(--text-dim); line-height: 1.8; margin-bottom: 2rem;">Ditch the paper
+                            tickets. Our <b>Live KDS</b> transmits orders instantly from the counter to the kitchen
+                            staff's screen.</p>
+                        <div class="feature-item">
+                            <icon>👨‍🍳</icon>
+                            <div>
+                                <h4>Instant Order Sync</h4>
+                                <p>The moment a bill is updated, the kitchen sees it. No shouting required.</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <icon>📊</icon>
+                            <div>
+                                <h4>Status Tracking</h4>
+                                <p>Mark orders as "Cooking" or "Ready" to keep your servers informed in real-time.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="order: 1;">
+                        <img src="{{ url_for('static', filename='res_previews/kds_mode.png') }}"
+                            class="showcase-image shadow-2xl" alt="Kitchen Display System View">
+                    </div>
+                </div>
+            </div>
+
+            <div class="showcase-section">
+                <div class="showcase-grid">
+                    <div>
+                        <span class="showcase-badge">Smart Inventory</span>
+                        <h3 style="font-size: 2.25rem; margin-bottom: 1.5rem; color: var(--gold);">Automated Stock
+                            Control</h3>
+                        <p style="color: var(--text-dim); line-height: 1.8; margin-bottom: 2rem;">JoyHotels
+                            automatically subtracts stock when you settle a bill. Stop manual counting and start
+                            tracking wastage.</p>
+                        <div class="feature-item">
+                            <icon>📉</icon>
+                            <div>
+                                <h4>Auto-Deduction</h4>
+                                <p>Menu items linked to inventory automatically decrease stock upon payment.</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <icon>⚠️</icon>
+                            <div>
+                                <h4>Low Stock Alerts</h4>
+                                <p>Get notified before you run out of essential ingredients.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <img src="{{ url_for('static', filename='res_previews/inventory_mgmt.png') }}"
+                            class="showcase-image shadow-2xl" alt="Restaurant Inventory Dashboard">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="container feature-card-grid" style="margin-bottom: 8rem;">
+        <div class="feature-card">
+            <icon>💰</icon>
+            <h3>Daily Settlement</h3>
+            <p>Detailed breakdown of Cash, Card, and UPI payments at the end of every shift.</p>
+        </div>
+        <div class="feature-card">
+            <icon>📱</icon>
+            <h3>WhatsApp Bills</h3>
+            <p>Save paper. Send professional PDF receipts directly to your customer's WhatsApp.</p>
+        </div>
+        <div class="feature-card">
+            <icon>🥗</icon>
+            <h3>Menu Engineering</h3>
+            <p>See your best-sellers and least profitable items to optimize your menu offerings.</p>
+        </div>
+    </div>
+
+    <section class="cta-section">
+        <div class="container">
+            <h2>Ready to transform your restaurant?</h2>
+            <p style="font-size: 1.1rem; opacity: 0.9;">Join hundreds of modern restaurants using JoyHotels to scale
+                their hospitality.</p>
+            <a href="{{ url_for('signup') }}" class="btn-dark">Launch My Restaurant POS Now</a>
+        </div>
+    </section>
+
+    <footer
+        style="padding: 4rem 2rem; background: #070b14; text-align: center; color: var(--text-dim); border-top: 1px solid rgba(255,255,255,0.05);">
+        <div class="nav-logo" style="justify-content: center; margin-bottom: 2rem;">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+            JoyHotels
+        </div>
+        <p>&copy; 2026 JoyHotels Restaurant Edition. All rights reserved.</p>
+    </footer>
+
+    <!-- Custom Cursor elements -->
+    <div class="custom-cursor"></div>
+    <div class="custom-cursor-dot"></div>
+    <script>
+        // Custom Cursor Logic
+        const cursor = document.querySelector('.custom-cursor');
+        const cursorDot = document.querySelector('.custom-cursor-dot');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.addEventListener('mousemove', (e) => {
+                cursor.style.left = e.clientX + 'px';
+                cursor.style.top = e.clientY + 'px';
+                cursorDot.style.left = e.clientX + 'px';
+                cursorDot.style.top = e.clientY + 'px';
+            });
+            document.querySelectorAll('a, button, .carousel-item, .bento-box, .feature-card, .feature-item').forEach(el => {
+                el.addEventListener('mouseenter', () => {
+                    cursor.style.width = '50px';
+                    cursor.style.height = '50px';
+                    cursor.style.backgroundColor = 'rgba(202, 138, 4, 0.1)';
+                    cursorDot.style.width = '0px';
+                    cursorDot.style.height = '0px';
+                });
+                el.addEventListener('mouseleave', () => {
+                    cursor.style.width = '20px';
+                    cursor.style.height = '20px';
+                    cursor.style.backgroundColor = 'transparent';
+                    cursorDot.style.width = '6px';
+                    cursorDot.style.height = '6px';
+                });
+            });
+        });
+    </script>
+
+    <!-- 3D Spinning Cylinder Carousel Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const tracks = document.querySelectorAll('.infinite-carousel-track');
+            tracks.forEach(track => {
+                const items = track.querySelectorAll('.carousel-item');
+                const totalItems = items.length;
+                const theta = 360 / totalItems;
+                
+                const radius = Math.round((350 * totalItems) / (2 * Math.PI)); 
+                track.style.setProperty('--radius', `${radius}px`);
+                
+                items.forEach((item, index) => {
+                    const angle = index * theta;
+                    item.style.transform = `translate(-50%, -50%) rotateY(${angle}deg) translateZ(${radius}px)`;
+                });
+            });
+        });
+    </script>
+
+    <script>
+        function toggleMenu() {
+            const nav = document.getElementById('navLinks');
+            if (nav) nav.classList.toggle('active');
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Payment - JoyHotels</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='lodgify_theme.css') }}?v=1.1">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, var(--bg-main) 0%, #E8EFE8 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(163,209,51,0.1) 0%, transparent 70%);
+            top: -100px;
+            right: -100px;
+            z-index: 0;
+        }
+
+        .payment-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 3rem 2.5rem;
+            border-radius: 24px;
+            width: 100%;
+            max-width: 460px;
+            text-align: center;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.06);
+            position: relative;
+            z-index: 1;
+        }
+
+        .plan-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            background: var(--brand-light);
+            color: var(--brand-primary-hover);
+            border-radius: 99px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            letter-spacing: 0.5px;
+        }
+
+        .price-display {
+            font-size: 4rem;
+            font-weight: 800;
+            color: var(--text-main);
+            margin-bottom: 0.75rem;
+        }
+
+        .payment-box > p {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            font-size: 1rem;
+        }
+
+        .qr-container {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            padding: 1.5rem;
+            border-radius: 16px;
+            margin-bottom: 2rem;
+            display: inline-block;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+        }
+
+        .qr-image {
+            width: 200px;
+            height: 200px;
+            display: block;
+        }
+
+        .utr-input-group {
+            margin-top: 1.5rem;
+            text-align: left;
+        }
+
+        .utr-input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-main);
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .utr-input {
+            width: 100%;
+            background: var(--bg-main);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: all 0.3s;
+        }
+
+        .utr-input::placeholder {
+            color: #A0AEC0;
+        }
+
+        .utr-input:focus {
+            border-color: var(--brand-primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(163, 209, 51, 0.15);
+            background: #fff;
+        }
+
+        .btn-pay {
+            background: var(--brand-primary);
+            color: #ffffff;
+            font-weight: 700;
+            border: none;
+            padding: 1.1rem;
+            border-radius: 10px;
+            width: 100%;
+            cursor: pointer;
+            margin-top: 1.5rem;
+            font-size: 1.05rem;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(163, 209, 51, 0.3);
+        }
+
+        .btn-pay:hover {
+            background: var(--brand-primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(163, 209, 51, 0.4);
+        }
+
+        .disclaimer {
+            margin-top: 1.5rem;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="payment-box" style="position: relative;">
+        <a href="/" style="position: absolute; top: 1rem; right: 1rem; color: var(--text-muted); text-decoration: none; font-size: 1.5rem; line-height: 1; padding: 0.5rem; border-radius: 50%; background: rgba(0,0,0,0.05); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">✕</a>
+        <div class="plan-badge" id="planBadge">Monthly Membership</div>
+        <div class="price-display" id="priceDisplay">₹299</div>
+
+        <p>Scan the QR code below to pay via any UPI app (GPay, PhonePe, Paytm)</p>
+
+        <div class="qr-container">
+            <img id="qrImage" class="qr-image" src="" alt="Payment QR Code">
+        </div>
+
+        <div class="utr-input-group">
+            <label for="utr">Enter UTR / Transaction ID (Required)</label>
+            <input type="text" id="utr" class="utr-input" placeholder="12-digit transaction number" maxlength="12">
+        </div>
+
+        <button onclick="handlePayment()" class="btn-pay">I've Made the Payment</button>
+
+        <p class="disclaimer">
+            Your account will be activated after the platform owner verifies the Transaction ID.
+        </p>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const plan = params.get('plan') || 'hotel';
+
+        const pricing = {
+            'hotel': { price: '299', name: 'Hotel Pro', duration: 'Monthly' },
+            'restaurant': { price: '199', name: 'Restaurant Pro', duration: 'Monthly' },
+            'both': { price: '399', name: 'Ultimate Bundle', duration: 'Monthly' },
+            'hotel_yearly': { price: '2999', name: 'Hotel Pro', duration: 'Yearly' },
+            'restaurant_yearly': { price: '1999', name: 'Restaurant Pro', duration: 'Yearly' },
+            'both_yearly': { price: '3999', name: 'Ultimate Bundle', duration: 'Yearly' }
+        };
+
+        const config = pricing[plan] || pricing['hotel'];
+        const { price, name: planName, duration } = config;
+
+        const upiId = 'josephmantero234@okhdfcbank';
+        const upiName = 'JoyHotels Subscription';
+
+        document.getElementById('planBadge').innerText = `${duration} ${planName}`;
+        document.getElementById('priceDisplay').innerText = '₹' + price;
+
+        const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(upiName)}&am=${price}&cu=INR`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink)}`;
+        document.getElementById('qrImage').src = qrUrl;
+
+        function handlePayment() {
+            const utr = document.getElementById('utr').value;
+            if (!utr || utr.length < 10) {
+                alert('Please enter a valid Transaction ID / UTR number.');
+                return;
+            }
+            sessionStorage.setItem('pending_utr', utr);
+            sessionStorage.setItem('pending_plan', plan);
+            window.location.href = '/signup';
+        }
+    </script>
+</body>
+
+</html>

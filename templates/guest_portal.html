@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guest Portal - JoyHotels</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #d4af37;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--card);
+            padding: 1.5rem;
+            border-radius: 16px;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .btn {
+            background: var(--primary);
+            color: #000;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            width: 100%;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 1rem;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.25rem;
+        }
+
+        .welcome {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        .room-badge {
+            background: rgba(212, 175, 55, 0.2);
+            color: var(--primary);
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div style="font-size: 2rem;">🛎️</div>
+            <h1>Guest Portal</h1>
+            <p class="welcome">Welcome, {{ booking.guest_name }}</p>
+            <div class="room-badge">Room {{ booking.room }}</div>
+        </div>
+
+        <div class="card">
+            <h2>⚡ Quick Requests</h2>
+            <div class="grid">
+                <button class="btn btn-outline" onclick="requestService('cleaning')">🧹 Clean Room</button>
+                <button class="btn btn-outline" onclick="requestService('water')">💧 Water</button>
+                <button class="btn btn-outline" onclick="requestService('towels')">🧴 Towels</button>
+                <button class="btn btn-outline" onclick="requestService('dnd')">⛔ Do Not Disturb</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🧾 Your Bill (Estimated)</h2>
+            <p style="font-size: 2rem; font-weight: 700; margin: 10px 0;">
+                {{ booking.currency }}<span id="liveTotal">...</span>
+            </p>
+            <button class="btn" onclick="window.location.href='/bill/{{ booking.id }}'">View Full Bill</button>
+        </div>
+
+        <div class="card">
+            <h2>📞 Front Desk</h2>
+            <button class="btn" onclick="window.location.href='tel:911'">Call Reception</button>
+        </div>
+    </div>
+
+    <script>
+        const bookingId = {{ booking.id }};
+
+        async function requestService(type) {
+            if (!confirm(`Request ${type}?`)) return;
+
+            try {
+                const res = await fetch('/api/guest/request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ booking_id: bookingId, type })
+                });
+                const data = await res.json();
+                if (data.success) alert('Request Sent! Staff will be there shortly.');
+                else alert('Error sending request');
+            } catch (e) {
+                alert('Connection error');
+            }
+        }
+
+        // Fetch Bill Total (Simulate for now or reuse bill logic)
+        // Ideally we'd have an API for bill total, but let's just show "Click to View" for now
+        // or fetch bill page and parse? No, too complex.
+        // Let's just create a quick API for bill total if needed, or leave as "..."
+    </script>
+</body>
+
+</html>

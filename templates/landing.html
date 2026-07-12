@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JoyHotels - Premium Hotel Management System</title>
+    <!-- Use the new Lodgify-inspired light theme -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='lodgify_theme.css') }}?v=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Custom Cursor */
+        body { cursor: none; }
+        .custom-cursor {
+            position: fixed; top: 0; left: 0;
+            width: 20px; height: 20px;
+            border: 2px solid var(--brand-primary, #a3d133);
+            border-radius: 50%;
+            pointer-events: none; z-index: 9999;
+            transform: translate(-50%, -50%);
+            transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), height 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .custom-cursor-dot {
+            position: fixed; top: 0; left: 0;
+            width: 6px; height: 6px;
+            background: var(--brand-primary, #a3d133);
+            border-radius: 50%;
+            pointer-events: none; z-index: 10000;
+            transform: translate(-50%, -50%);
+            transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        /* Menu Effects */
+        .nav-links a { position: relative; transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .nav-links a::after {
+            content: ''; position: absolute;
+            width: 0; height: 2px;
+            bottom: -4px; left: 50%; transform: translateX(-50%);
+            background-color: var(--brand-primary, #a3d133);
+            transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .nav-links a:hover::after { width: 100%; }
+        .nav-links a.btn-primary::after, .nav-links a.btn-outline::after { display: none; }
+        
+        /* Dribbble Easing and Load Reveal Animations */
+        .reveal-mask {
+            display: block;
+            overflow: hidden;
+        }
+        .reveal-mask-inner {
+            display: block;
+            transform: translateY(110%);
+            animation: slideUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .scale-fade-in {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: scaleFadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes slideUp {
+            to { transform: translateY(0); }
+        }
+        @keyframes scaleFadeIn {
+            to { opacity: 1; transform: scale(1); }
+        }
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
+        .delay-400 { animation-delay: 0.4s; }
+        .delay-500 { animation-delay: 0.5s; }
+
+        /* Infinite Carousel - 3D */
+        .infinite-carousel {
+            position: relative; width: 100%; height: 180px; margin: 4rem 0;
+            background: rgba(163, 209, 51, 0.05); padding: 0;
+            border-top: 1px solid rgba(163, 209, 51, 0.1); border-bottom: 1px solid rgba(163, 209, 51, 0.1);
+            perspective: 1200px; display: flex; justify-content: center; align-items: center; overflow: hidden;
+            mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+            -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.5s ease;
+        }
+        .infinite-carousel:hover {
+            transform: scale(1.15);
+            z-index: 20;
+            box-shadow: 0 20px 60px rgba(163, 209, 51, 0.15);
+        }
+        .infinite-carousel-track {
+            position: absolute; width: 0; height: 100%; transform-style: preserve-3d;
+            animation: spinCarousel 30s linear infinite;
+        }
+        .carousel-item {
+            position: absolute; top: 50%; left: 50%; font-size: 1.3rem; font-weight: 700;
+            color: var(--text-main, #1e293b); white-space: nowrap; display: flex; align-items: center; gap: 0.75rem;
+            backface-visibility: hidden;
+        }
+        .carousel-item span { color: var(--brand-primary, #a3d133); font-size: 1.5rem; }
+        @keyframes spinCarousel {
+            from { transform: translateZ(calc(var(--radius) * -1)) rotateY(0deg); }
+            to { transform: translateZ(calc(var(--radius) * -1)) rotateY(-360deg); }
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+            JoyHotels
+        </div>
+        <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
+        <div class="nav-links" id="navLinks">
+            <a href="#features">Features</a>
+            <a href="{{ url_for('pricing') }}">Pricing</a>
+            <a href="{{ url_for('login') }}">Login</a>
+            <a href="{{ url_for('signup') }}" class="btn-primary">Get Started</a>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <video autoplay loop muted playsinline class="hero-video-bg">
+            <source src="{{ url_for('static', filename='hotel_promo.mp4') }}" type="video/mp4">
+        </video>
+        <div class="hero-content">
+            <div class="reveal-mask" style="margin-bottom: 1.5rem;"><span class="section-tag reveal-mask-inner" style="margin-bottom: 0;">Next-Generation Hotel Management</span></div>
+            <div class="reveal-mask"><h1 class="reveal-mask-inner delay-100">Manage Your Hotel with Elegance</h1></div>
+            <div class="reveal-mask"><p class="reveal-mask-inner delay-200">The premium SaaS dashboard for modern hoteliers. Simple, intuitive, and easy to
+                use for any staff member. Effortless booking management, financial tracking, and real-time analytics in
+                one stunning interface.</p></div>
+            <div class="reveal-mask" style="display: flex; justify-content: center; margin-top: 1.5rem;">
+                <div class="reveal-mask-inner delay-300" style="display: flex; gap: 1rem;">
+                    <a href="{{ url_for('signup') }}" class="btn-primary">Start Your Free Trial</a>
+                    <a href="#features" class="btn-outline">Watch Demo</a>
+                </div>
+            </div>
+
+            <div class="hero-img-container scale-fade-in delay-500">
+                <span class="floating-badge">v2.0 LIVE</span>
+                <img src="{{ url_for('static', filename='ledger_preview.png') }}" class="hero-img"
+                    alt="Financial Ledger Dashboard">
+            </div>
+        </div>
+    </header>
+
+    <!-- Infinite Carousel -->
+    <div class="infinite-carousel">
+        <div class="infinite-carousel-track">
+            <div class="carousel-item"><span>✦</span> Trusted by 500+ Hotels</div>
+            <div class="carousel-item"><span>✦</span> 99.99% Uptime Guarantee</div>
+            <div class="carousel-item"><span>✦</span> Zero Setup Cost</div>
+            <div class="carousel-item"><span>✦</span> 24/7 Premium Support</div>
+            <div class="carousel-item"><span>✦</span> Automated Inventory</div>
+            <div class="carousel-item"><span>✦</span> Global Currency & Tax</div>
+            <div class="carousel-item"><span>✦</span> Trusted by 500+ Hotels</div>
+            <div class="carousel-item"><span>✦</span> 99.99% Uptime Guarantee</div>
+            <div class="carousel-item"><span>✦</span> Zero Setup Cost</div>
+            <div class="carousel-item"><span>✦</span> 24/7 Premium Support</div>
+            <div class="carousel-item"><span>✦</span> Automated Inventory</div>
+            <div class="carousel-item"><span>✦</span> Global Currency & Tax</div>
+        </div>
+    </div>
+
+    <!-- Restaurant Version Promo (BIG & HIGHLIGHTED) -->
+    <div class="reveal"
+        style="background: linear-gradient(135deg, var(--brand-primary) 0%, rgba(163, 209, 51, 0.8) 100%); padding: 7rem 0; position: relative; overflow: hidden; box-shadow: 0 10px 40px rgba(163, 209, 51, 0.2);">
+        <div class="container"
+            style="position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 4rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 320px;" class="bento-box"
+                style="background: rgba(255, 255, 255, 0.95); border-color: rgba(255, 255, 255, 0.5);">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem;">
+                    <span
+                        style="background: var(--brand-primary); color: #fff; padding: 6px 14px; border-radius: 4px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;">NEW
+                        RELEASE</span>
+                    <span
+                        style="color: var(--brand-primary-hover); font-size: 0.95rem; font-weight: 700; letter-spacing: 1px;">JoyHotels
+                        Restaurant Edition</span>
+                </div>
+                <h2 style="font-size: 3.5rem; line-height: 1.2; margin-bottom: 2rem; color: var(--text-main);">
+                    Running a <span style="color: var(--brand-primary-hover);">Restaurant</span> too?</h2>
+                <p style="color: var(--text-muted); font-size: 1.25rem; line-height: 1.7; margin: 0; max-width: 650px;">
+                    Experience the most powerful POS, Kitchen Display System (KDS), and automated inventory management
+                    built for premium dining.</p>
+            </div>
+            <div style="text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1.5rem;">
+                <a href="{{ url_for('restaurant_index') }}" class="btn-primary"
+                    style="white-space: nowrap; padding: 1.5rem 4rem; font-size: 1.2rem; background: #fff; color: var(--brand-primary-hover); box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1); transform: scale(1.05); transition: all 0.3s ease;">Explore
+                    Restaurant POS →</a>
+                <p style="color: #fff; font-size: 0.95rem; opacity: 0.95; font-weight: 600; letter-spacing: 0.5px;">
+                    Zero Setup Cost • Live KDS • WhatsApp Billing</p>
+            </div>
+        </div>
+        <!-- Decorative Background Element -->
+        <div
+            style="position: absolute; top: -50%; right: -10%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%); pointer-events: none;">
+        </div>
+    </div>
+
+    <!-- Stats Section -->
+    <div style="background: var(--bg-card); padding: 4rem 0; border-bottom: 1px solid var(--border-color);">
+        <div class="container"
+            style="display: flex; flex-wrap: wrap; justify-content: center; gap: 4rem; text-align: center;">
+            <div>
+                <div
+                    style="font-size: 2rem; font-weight: 800; color: var(--brand-primary-hover); margin-bottom: 0.25rem;">
+                    500+</div>
+                <div
+                    style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                    Trusted Hotels</div>
+            </div>
+            <div>
+                <div
+                    style="font-size: 2rem; font-weight: 800; color: var(--brand-primary-hover); margin-bottom: 0.25rem;">
+                    2500+</div>
+                <div
+                    style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                    Rooms Managed</div>
+            </div>
+            <div>
+                <div
+                    style="font-size: 2rem; font-weight: 800; color: var(--brand-primary-hover); margin-bottom: 0.25rem;">
+                    15000+</div>
+                <div
+                    style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                    Guests Welcomed</div>
+            </div>
+            <div>
+                <div
+                    style="font-size: 2rem; font-weight: 800; color: var(--brand-primary-hover); margin-bottom: 0.25rem;">
+                    99.99%</div>
+                <div
+                    style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                    System Uptime</div>
+            </div>
+        </div>
+    </div>
+
+    <section id="features" class="features">
+        <div class="container">
+            <div style="text-align: center; max-width: 700px; margin: 0 auto 3rem;">
+                <span class="section-tag">Powerful Features</span>
+                <h2 style="font-size: 2.8rem; margin-top: 1rem; color: var(--text-main);">Everything you need to grow
+                    your hotel business</h2>
+            </div>
+        </div>
+
+        <!-- Showcase 1: Financials -->
+        <div class="showcase-section container">
+            <div class="showcase-grid reveal">
+                <div class="bento-box">
+                    <span class="section-tag">Financial Ledger</span>
+                    <h3 style="font-size: 2.2rem; margin-top: 0.5rem; margin-bottom: 1.5rem; color: var(--text-main);">
+                        Master Your Revenue</h3>
+                    <p style="color: var(--text-muted); line-height: 1.8; margin-bottom: 2rem; font-size: 1.1rem;">Stop
+                        guessing and
+                        start growing. Our financial ledger provides real-time insights into your profit margins,
+                        expense breakdowns, and transaction history.</p>
+                    <div class="feature-item">
+                        <div class="feature-icon">📈</div>
+                        <div>
+                            <h4>Visual Profit Tracking</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Interactive Pie charts
+                                and
+                                Line graphs showing exactly where your money comes from and goes.</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">💰</div>
+                        <div>
+                            <h4>Global Tax & Currency</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Configure custom tax
+                                rates
+                                (GST/VAT) and currency symbols specifically for your region.</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🔍</div>
+                        <div>
+                            <h4>Smart Search & Filters</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Find any transaction
+                                instantly
+                                by date, guest name, or payment category.</p>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <img src="{{ url_for('static', filename='finance_preview.png') }}" class="showcase-image"
+                        alt="Global Tax, Currency and Finance Settings">
+                </div>
+            </div>
+        </div>
+
+        <!-- Showcase 2: Inventory -->
+        <div class="showcase-section container">
+            <div class="showcase-grid reveal">
+                <div style="order: 2;" class="bento-box">
+                    <span class="section-tag">Inventory Management</span>
+                    <h3 style="font-size: 2.2rem; margin-top: 0.5rem; margin-bottom: 1.5rem; color: var(--text-main);">
+                        Complete Control Over Your
+                        Rooms</h3>
+                    <p style="color: var(--text-muted); line-height: 1.8; margin-bottom: 2rem; font-size: 1.1rem;">
+                        Manage your room
+                        inventory with ease. Add new room types, set custom pricing, and monitor occupancy in real-time.
+                    </p>
+                    <div class="feature-item">
+                        <div class="feature-icon">🛋️</div>
+                        <div>
+                            <h4>Dynamic Room Types</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Create custom room types
+                                (Deluxe, Suite, Single) and manage them with a single click.</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🛡️</div>
+                        <div>
+                            <h4>Conflict Protection</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Our system prevents
+                                double-bookings and unintended deletions, keeping your data safe.</p>
+                        </div>
+                    </div>
+                </div>
+                <div style="order: 1; display: flex; flex-direction: column; gap: 1.5rem;">
+                    <img src="{{ url_for('static', filename='room_management_preview.png') }}" class="showcase-image"
+                        alt="Room Management Dashboard with Status Cards">
+                    <img src="{{ url_for('static', filename='management_preview.png') }}" class="showcase-image"
+                        alt="Room Inventory & Management Grid">
+                </div>
+            </div>
+        </div>
+
+        <!-- Showcase 3: System Safety -->
+        <div class="showcase-section container">
+            <div class="showcase-grid reveal">
+                <div class="bento-box">
+                    <span class="section-tag">Security & Backups</span>
+                    <h3 style="font-size: 2.2rem; margin-top: 0.5rem; margin-bottom: 1.5rem; color: var(--text-main);">
+                        Your Data, Always Protected
+                    </h3>
+                    <p style="color: var(--text-muted); line-height: 1.8; margin-bottom: 2rem; font-size: 1.1rem;">We
+                        take security
+                        seriously. Manage staff permissions and keep your data safe with one-click backups and system
+                        maintenance.</p>
+                    <div class="feature-item">
+                        <div class="feature-icon">🔐</div>
+                        <div>
+                            <h4>Two-Factor Auth (2FA)</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Secure your login with
+                                real-time OTP codes sent directly to your email for ultimate protection.</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">📜</div>
+                        <div>
+                            <h4>System Audit Trail</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Monitor every action
+                                taken by
+                                staff with detailed timestamps and IP tracking for full accountability.</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">⛓️</div>
+                        <div>
+                            <h4>System Restore</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Moved servers? Restoring
+                                your
+                                business is as simple as uploading your backup zip.</p>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <img src="{{ url_for('static', filename='security_preview.png') }}" class="showcase-image"
+                        alt="Two-Factor Authentication Security Settings">
+                </div>
+            </div>
+        </div>
+
+        <!-- Showcase 4: Staff Management -->
+        <div class="showcase-section container">
+            <div class="showcase-grid reveal">
+                <div style="order: 2;" class="bento-box">
+                    <span class="section-tag">Team Collaboration</span>
+                    <h3 style="font-size: 2.2rem; margin-top: 0.5rem; margin-bottom: 1.5rem; color: var(--text-main);">
+                        Empower Your Staff</h3>
+                    <p style="color: var(--text-muted); line-height: 1.8; margin-bottom: 2rem; font-size: 1.1rem;">
+                        Delegate tasks
+                        without compromising security. Create dedicated accounts for receptionists and housekeeping with
+                        tailored permissions.</p>
+                    <div class="feature-item">
+                        <div class="feature-icon">🔑</div>
+                        <div>
+                            <h4>Role-Based Access</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Receptionists manage
+                                bookings;
+                                Housekeepers see cleaning lists; You control everything.</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🔐</div>
+                        <div>
+                            <h4>Identity Security</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Each staff member has
+                                their
+                                own secure login, making accountability simple and transparent.</p>
+                        </div>
+                    </div>
+                </div>
+                <div style="order: 1;">
+                    <img src="{{ url_for('static', filename='audit_preview.png') }}" class="showcase-image"
+                        alt="System Audit Trail Modal">
+                </div>
+            </div>
+        </div>
+
+        <!-- Showcase 5: Guest Insights -->
+        <div class="showcase-section container">
+            <div class="showcase-grid reveal">
+                <div class="bento-box">
+                    <span class="section-tag">Guest Relationship</span>
+                    <h3 style="font-size: 2.2rem; margin-top: 0.5rem; margin-bottom: 1.5rem; color: var(--text-main);">
+                        Build Lasting Connections
+                    </h3>
+                    <p style="color: var(--text-muted); line-height: 1.8; margin-bottom: 2rem; font-size: 1.1rem;">Never
+                        forget a face.
+                        Our guest profile system tracks history, preferences, and identity documents for every visitor.
+                    </p>
+                    <div class="feature-item">
+                        <div class="feature-icon">👤</div>
+                        <div>
+                            <h4>Complete Guest History</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">View every stay,
+                                payment, and
+                                interaction across your entire hotel network.</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">📸</div>
+                        <div>
+                            <h4>Digital ID Storage</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Securely store and
+                                retrieve
+                                guest IDs and photos for instant verification during check-in.</p>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <img src="{{ url_for('static', filename='management_preview.png') }}" class="showcase-image"
+                        alt="Guest History and Management Grid">
+                </div>
+            </div>
+        </div>
+
+        <!-- Showcase 6: Professional Invoicing -->
+        <div class="showcase-section container">
+            <div class="showcase-grid reveal">
+                <div style="order: 2;" class="bento-box">
+                    <span class="section-tag">Digital Billing</span>
+                    <h3 style="font-size: 2.2rem; margin-top: 0.5rem; margin-bottom: 1.5rem; color: var(--text-main);">
+                        Professional Guest Receipts
+                    </h3>
+                    <p style="color: var(--text-muted); line-height: 1.8; margin-bottom: 2rem; font-size: 1.1rem;">Go
+                        paperless with
+                        our elegant digital billing system. Generate comprehensive receipts that include guest
+                        information, stay details, and itemized charges.</p>
+                    <div class="feature-item">
+                        <div class="feature-icon">🧾</div>
+                        <div>
+                            <h4>Comprehensive Billing</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Separate tracking for
+                                Room
+                                Charges, Food, Laundry, Water, and Car Wash services.</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">📱</div>
+                        <div>
+                            <h4>WhatsApp Integration</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Share digital bills and
+                                welcome messages instantly via WhatsApp with a single click.</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">📋</div>
+                        <div>
+                            <h4>Detailed Stay Info</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Clear display of
+                                Check-in/Check-out times, Room Numbers, and Guest Contact details.</p>
+                        </div>
+                    </div>
+                </div>
+                <div style="order: 1;">
+                    <img src="{{ url_for('static', filename='bill_preview.png') }}" class="showcase-image"
+                        alt="Real Guest Bill Receipt">
+                </div>
+            </div>
+        </div>
+
+        <!-- Showcase 7: Reservation Calendar -->
+        <div class="showcase-section container">
+            <div class="showcase-grid reveal">
+                <div class="bento-box">
+                    <span class="section-tag">Smart Scheduling</span>
+                    <h3 style="font-size: 2.2rem; margin-top: 0.5rem; margin-bottom: 1.5rem; color: var(--text-main);">
+                        Visual Reservation Calendar
+                    </h3>
+                    <p style="color: var(--text-muted); line-height: 1.8; margin-bottom: 2rem; font-size: 1.1rem;">Plan
+                        for the future
+                        with confidence. Our drag-and-drop calendar gives you a bird's-eye view of your entire hotel's
+                        occupancy.</p>
+                    <div class="feature-item">
+                        <div class="feature-icon">📅</div>
+                        <div>
+                            <h4>Future Booking Visibility</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Instantly see available
+                                slots
+                                for next week, next month, or even next year.</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">✨</div>
+                        <div>
+                            <h4>One-Tap Conversions</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Convert any future
+                                reservation
+                                into an active check-in with a single click from the calendar.</p>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <img src="{{ url_for('static', filename='calendar_preview.png') }}" class="showcase-image"
+                        alt="Interactive Reservation Calendar">
+                </div>
+            </div>
+        </div>
+
+        <!-- Showcase 8: Service Excellence -->
+        <div class="showcase-section container" style="border-bottom: none;">
+            <div class="showcase-grid reveal">
+                <div style="order: 2;" class="bento-box">
+                    <span class="section-tag">Service Excellence</span>
+                    <h3 style="font-size: 2.2rem; margin-top: 0.5rem; margin-bottom: 1.5rem; color: var(--text-main);">
+                        Modern Guest Experience</h3>
+                    <p style="color: var(--text-muted); line-height: 1.8; margin-bottom: 2rem; font-size: 1.1rem;">
+                        Elevate your service
+                        standards with magic links and smart redirect QR codes that connect staff and guests seamlessly.
+                    </p>
+                    <div class="feature-item">
+                        <div class="feature-icon">🧹</div>
+                        <div>
+                            <h4>Housekeeping Magic Links</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Give staff zero-login
+                                access
+                                to room status updates via private, token-secured portal links.</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">⭐</div>
+                        <div>
+                            <h4>Smart QR Feedback</h4>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Automated redirect to
+                                Google
+                                Maps reviews or custom feedback forms to boost your online rating.</p>
+                        </div>
+                    </div>
+                </div>
+                <div style="order: 1; display: flex; flex-direction: column; gap: 2rem; align-items: center;">
+                    <img src="{{ url_for('static', filename='housekeeping_preview.png') }}" class="showcase-image"
+                        style="max-width: 300px; border-radius: 30px; border: 8px solid var(--border-color);"
+                        alt="Mobile Housekeeping Portal View">
+                    <img src="{{ url_for('static', filename='settings_preview.png') }}" class="showcase-image"
+                        alt="Service Excellence Tools & Magic Links">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer updated to light theme -->
+    <footer
+        style="padding: 4rem 2rem; background: var(--bg-card); text-align: center; color: var(--text-muted); border-top: 1px solid var(--border-color);">
+        <div class="nav-logo" style="justify-content: center; margin-bottom: 2rem;">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+            JoyHotels
+        </div>
+        <div style="display: flex; gap: 2rem; justify-content: center; margin-bottom: 2rem;">
+            <a href="#" style="color: var(--text-muted); font-weight: 500; transition: color 0.3s;"
+                onmouseover="this.style.color='var(--brand-primary)'"
+                onmouseout="this.style.color='var(--text-muted)'">Terms of Service</a>
+            <a href="#" style="color: var(--text-muted); font-weight: 500; transition: color 0.3s;"
+                onmouseover="this.style.color='var(--brand-primary)'"
+                onmouseout="this.style.color='var(--text-muted)'">Privacy Policy</a>
+            <a href="#" style="color: var(--text-muted); font-weight: 500; transition: color 0.3s;"
+                onmouseover="this.style.color='var(--brand-primary)'"
+                onmouseout="this.style.color='var(--text-muted)'">Support</a>
+        </div>
+        <p style="margin: 0;">&copy; 2026 JoyHotels. Built for Excellence.</p>
+    </footer>
+
+    <!-- Custom Cursor elements -->
+    <div class="custom-cursor"></div>
+    <div class="custom-cursor-dot"></div>
+    <script>
+        // Custom Cursor Logic
+        const cursor = document.querySelector('.custom-cursor');
+        const cursorDot = document.querySelector('.custom-cursor-dot');
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            document.addEventListener('mousemove', (e) => {
+                cursor.style.left = e.clientX + 'px';
+                cursor.style.top = e.clientY + 'px';
+                cursorDot.style.left = e.clientX + 'px';
+                cursorDot.style.top = e.clientY + 'px';
+            });
+            document.querySelectorAll('a, button, .carousel-item, .bento-box, .feature-card, .feature-item').forEach(el => {
+                el.addEventListener('mouseenter', () => {
+                    cursor.style.width = '50px';
+                    cursor.style.height = '50px';
+                    cursor.style.backgroundColor = 'rgba(163, 209, 51, 0.1)';
+                    cursorDot.style.width = '0px';
+                    cursorDot.style.height = '0px';
+                });
+                el.addEventListener('mouseleave', () => {
+                    cursor.style.width = '20px';
+                    cursor.style.height = '20px';
+                    cursor.style.backgroundColor = 'transparent';
+                    cursorDot.style.width = '6px';
+                    cursorDot.style.height = '6px';
+                });
+            });
+        });
+    </script>
+
+    <!-- 3D Spinning Cylinder Carousel Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const tracks = document.querySelectorAll('.infinite-carousel-track');
+            tracks.forEach(track => {
+                const items = track.querySelectorAll('.carousel-item');
+                const totalItems = items.length;
+                const theta = 360 / totalItems;
+                
+                const radius = Math.round((350 * totalItems) / (2 * Math.PI)); 
+                track.style.setProperty('--radius', `${radius}px`);
+                
+                items.forEach((item, index) => {
+                    const angle = index * theta;
+                    item.style.transform = `translate(-50%, -50%) rotateY(${angle}deg) translateZ(${radius}px)`;
+                });
+            });
+        });
+    </script>
+
+    <script>
+        function toggleMenu() {
+            const nav = document.getElementById('navLinks');
+            if (nav) nav.classList.toggle('active');
+        }
+
+        // Scroll reveal animation
+        function revealElements() {
+            const reveals = document.querySelectorAll(".reveal");
+            for (let i = 0; i < reveals.length; i++) {
+                const windowHeight = window.innerHeight;
+                const elementTop = reveals[i].getBoundingClientRect().top;
+                const elementVisible = 100;
+                if (elementTop < windowHeight - elementVisible) {
+                    reveals[i].classList.add("active");
+                }
+            }
+        }
+        window.addEventListener("scroll", revealElements);
+        window.addEventListener("load", revealElements);
+        document.addEventListener('DOMContentLoaded', revealElements);
+    </script>
+</body>
+
+</html>

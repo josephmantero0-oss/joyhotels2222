@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing - JoyHotels</title>
+    <!-- Replacing old dark theme with Lodgify light theme -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='lodgify_theme.css') }}?v=1.1">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+            JoyHotels
+        </div>
+        <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
+        <div class="nav-links" id="navLinks">
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('pricing') }}" style="color: var(--brand-primary); font-weight: 700;">Pricing</a>
+            <a href="{{ url_for('login') }}">Login</a>
+            <a href="{{ url_for('signup') }}" class="btn-primary">Get Started</a>
+        </div>
+    </nav>
+
+    <div class="pricing-container" style="position: relative;">
+        <a href="/" style="position: absolute; top: 1rem; right: 1rem; color: var(--text-muted); text-decoration: none; font-size: 1.5rem; line-height: 1; padding: 0.5rem; border-radius: 50%; background: rgba(0,0,0,0.05); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; z-index: 10;">✕</a>
+        <h1 style="color: var(--text-main); font-size: 3.5rem; font-weight: 800; margin-bottom: 1rem;">Choose Your Plan</h1>
+        <p style="color: var(--text-muted); font-size: 1.2rem;">Simple, transparent pricing for hospitality businesses scaling up.</p>
+
+        <!-- Pricing Toggle -->
+        <div style="display: flex; align-items: center; justify-content: center; gap: 1.2rem; margin: 3rem 0;">
+            <span id="monthlyLabel" style="color: var(--text-main); font-weight: 700;">Monthly</span>
+            <label class="switch">
+                <input type="checkbox" id="pricingToggle" onchange="togglePricing()">
+                <span class="slider round"></span>
+            </label>
+            <span id="yearlyLabel" style="color: var(--text-muted); font-weight: 500;">Yearly <span
+                    style="background: var(--brand-light); color: var(--brand-primary-hover); padding: 4px 10px; border-radius: 99px; font-size: 0.75rem; margin-left: 8px; font-weight: 800;">2 MONTHS FREE</span></span>
+        </div>
+
+        <div class="pricing-grid">
+            <!-- Restaurant Plan -->
+            <div class="plan-card">
+                <div style="font-size: 2.5rem; margin-bottom: 1.2rem; background: var(--bg-main); width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 12px;">🍽️</div>
+                <h2>Restaurant Pro</h2>
+                <div class="price" id="resPrice">₹199<span class="period">/mo</span></div>
+                <p>Complete POS & Table Management.</p>
+                <ul class="features-list">
+                    <li>Visual Table Layout</li>
+                    <li>Fast Billing via Codes</li>
+                    <li>Menu & Item Settings</li>
+                    <li>WhatsApp Receipts</li>
+                    <li>Financial Ledger</li>
+                </ul>
+                <a href="/payment?plan=restaurant" id="resLink" class="btn-outline"
+                    style="width: 100%; display: block; box-sizing: border-box; text-align: center;">Choose Restaurant</a>
+            </div>
+
+            <!-- Hotel Plan -->
+            <div class="plan-card">
+                <div style="font-size: 2.5rem; margin-bottom: 1.2rem; background: var(--bg-main); width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 12px;">🏨</div>
+                <h2>Hotel Pro</h2>
+                <div class="price" id="hotelPrice">₹299<span class="period">/mo</span></div>
+                <p>Advanced Hotel Operations.</p>
+                <ul class="features-list">
+                    <li>Unlimited Rooms</li>
+                    <li>Reservation Calendar</li>
+                    <li>Housekeeping Portal</li>
+                    <li>Audit Logs & 2FA</li>
+                    <li>Guest History & ID</li>
+                </ul>
+                <a href="/payment?plan=hotel" id="hotelLink" class="btn-outline"
+                    style="width: 100%; display: block; box-sizing: border-box; text-align: center;">Choose Hotel</a>
+            </div>
+
+            <!-- Bundle Plan -->
+            <div class="plan-card popular">
+                <div style="font-size: 2.5rem; margin-bottom: 1.2rem; background: var(--brand-light); width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 12px;">⚡</div>
+                <h2>Ultimate Bundle</h2>
+                <div class="price" id="bundlePrice">₹399<span class="period">/mo</span></div>
+                <p>Full Hotel & Restaurant Suite.</p>
+                <ul class="features-list">
+                    <li>Everything in Hotel Pro</li>
+                    <li>Everything in Restaurant Pro</li>
+                    <li style="font-weight: 600; color: var(--text-main);">Unified Switcher Dashboard</li>
+                    <li>Priority 24/7 Support</li>
+                    <li>Best Value For Growth</li>
+                </ul>
+                <a href="/payment?plan=both" id="bundleLink" class="btn-primary btn-full">Choose Bundle</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Minimal Light Theme Footer -->
+    <footer
+        style="padding: 3rem 2rem; background: var(--bg-card); text-align: center; color: var(--text-muted); border-top: 1px solid var(--border-color); margin-top: 4rem;">
+        <p style="margin: 0; font-size: 0.9rem;">&copy; 2026 JoyHotels. Built for Excellence.</p>
+    </footer>
+
+    <style>
+        /* Modern Switch Toggle Adjusted for Light Theme */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 54px;
+            height: 30px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #CBD5E1;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        input:checked+.slider {
+            background-color: var(--brand-primary);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(24px);
+        }
+    </style>
+
+    <script>
+        function toggleMenu() {
+            const nav = document.getElementById('navLinks');
+            if (nav) nav.classList.toggle('active');
+        }
+
+        function togglePricing() {
+            const isYearly = document.getElementById('pricingToggle').checked;
+            const mLabel = document.getElementById('monthlyLabel');
+            const yLabel = document.getElementById('yearlyLabel');
+
+            if (isYearly) {
+                mLabel.style.color = 'var(--text-muted)';
+                mLabel.style.fontWeight = '500';
+                yLabel.style.color = 'var(--text-main)';
+                yLabel.style.fontWeight = '700';
+
+                // Added small animation effect
+                animatePrices([
+                    {id: 'resPrice', p: '₹1,999'},
+                    {id: 'hotelPrice', p: '₹2,999'},
+                    {id: 'bundlePrice', p: '₹3,999'}
+                ], 'yr');
+
+                document.getElementById('resLink').href = '/payment?plan=restaurant_yearly';
+                document.getElementById('hotelLink').href = '/payment?plan=hotel_yearly';
+                document.getElementById('bundleLink').href = '/payment?plan=both_yearly';
+            } else {
+                mLabel.style.color = 'var(--text-main)';
+                mLabel.style.fontWeight = '700';
+                yLabel.style.color = 'var(--text-muted)';
+                yLabel.style.fontWeight = '500';
+
+                animatePrices([
+                    {id: 'resPrice', p: '₹199'},
+                    {id: 'hotelPrice', p: '₹299'},
+                    {id: 'bundlePrice', p: '₹399'}
+                ], 'mo');
+
+                document.getElementById('resLink').href = '/payment?plan=restaurant';
+                document.getElementById('hotelLink').href = '/payment?plan=hotel';
+                document.getElementById('bundleLink').href = '/payment?plan=both';
+            }
+        }
+        
+        function animatePrices(prices, period) {
+            prices.forEach(item => {
+                const el = document.getElementById(item.id);
+                el.style.opacity = '0';
+                setTimeout(() => {
+                    el.innerHTML = `${item.p}<span class="period">/${period}</span>`;
+                    el.style.opacity = '1';
+                    el.style.transition = 'opacity 0.3s ease';
+                }, 150);
+            });
+        }
+    </script>
+</body>
+
+</html>

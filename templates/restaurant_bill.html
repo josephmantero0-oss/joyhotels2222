@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant Receipt - #{{ bill_id }}</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .no-print {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .print-btn {
+            padding: 12px 25px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 0 5px;
+            font-weight: 600;
+        }
+
+        .bill-container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px dashed #eee;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #1e293b;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 2px;
+        }
+
+        .bill-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            margin-bottom: 20px;
+            color: #1e293b;
+        }
+
+        .bill-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .bill-table th {
+            text-align: left;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #64748b;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .bill-table td {
+            padding: 12px 0;
+            font-size: 14px;
+            border-bottom: 1px solid #f8fafc;
+        }
+
+        .amount {
+            text-align: right;
+        }
+
+        .totals {
+            border-top: 2px solid #1e293b;
+            padding-top: 15px;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .grand-total {
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+            color: #10b981;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 12px;
+            color: #94a3b8;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+
+            .bill-container {
+                box-shadow: none;
+                border: none;
+                width: 100%;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="no-print">
+        <button class="print-btn" onclick="window.print()">🖨️ Print Receipt</button>
+        <button class="print-btn" style="background: #e67e22;" onclick="downloadPDF()">📄 Download PDF</button>
+        <button class="print-btn" style="background: #25D366;" onclick="shareWhatsApp()">📲 WhatsApp</button>
+        <button class="print-btn" style="background: #64748b;" onclick="window.close()">Close</button>
+    </div>
+
+    <div class="bill-container" id="billContent">
+        <div class="header">
+            <h1>{{ hotel_name }}</h1>
+            <p>{{ hotel_address }}</p>
+            <p>Phone: {{ hotel_phone }}</p>
+            <h2 style="margin-top: 10px; font-size: 16px; color: #10b981;">RESTAURANT RECEIPT</h2>
+        </div>
+
+        <div class="bill-meta" id="billMeta">
+            <!-- Loading... -->
+        </div>
+
+        <table class="bill-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th style="text-align: center;">Qty</th>
+                    <th class="amount">Price</th>
+                </tr>
+            </thead>
+            <tbody id="billItems">
+                <!-- Loading... -->
+            </tbody>
+        </table>
+
+        <div class="totals" id="billTotals">
+            <!-- Loading... -->
+        </div>
+
+        <div class="footer">
+            <p>Thank you for visit! 🙏</p>
+            <p>Visit us again at {{ hotel_name }}</p>
+            <p style="margin-top: 5px; font-size: 10px;">Generated on: <span id="genTime"></span></p>
+        </div>
+    </div>
+
+    <script>
+        const billId = parseInt("{{ bill_id }}");
+        const CURRENCY = "{{ currency }}";
+        const TAX_RATE = parseFloat("{{ tax_rate }}") || 0;
+        let globalBill = null;
+
+        async function loadBill() {
+            try {
+                const response = await fetch(`/api/restaurant/bill/${billId}`);
+                const data = await response.json();
+                globalBill = data;
+
+                document.getElementById('genTime').innerText = new Date().toLocaleString();
+
+                document.getElementById('billMeta').innerHTML = `
+                    <div>
+                        <p><strong>Bill ID:</strong> #${data.id}</p>
+                        <p><strong>Table:</strong> ${data.table_id}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <p><strong>Date:</strong> ${data.created_at.split(' ')[0]}</p>
+                        <p><strong>Time:</strong> ${data.created_at.split(' ')[1]}</p>
+                    </div>
+                `;
+
+                document.getElementById('billItems').innerHTML = data.items.map(it => `
+                    <tr>
+                        <td>${it.name}</td>
+                        <td style="text-align: center;">${it.quantity}</td>
+                        <td class="amount">${CURRENCY}${(it.price * it.quantity).toFixed(2)}</td>
+                    </tr>
+                `).join('');
+
+                const subtotal = data.total;
+                const tax = subtotal * (TAX_RATE / 100);
+                const grandTotal = subtotal + tax;
+
+                document.getElementById('billTotals').innerHTML = `
+                    <div class="total-row"><span>Subtotal</span><span>${CURRENCY}${subtotal.toFixed(2)}</span></div>
+                    ${TAX_RATE > 0 ? `<div class="total-row"><span>Tax (${TAX_RATE}%)</span><span>${CURRENCY}${tax.toFixed(2)}</span></div>` : ''}
+                    <div class="total-row grand-total"><span>Total</span><span>${CURRENCY}${grandTotal.toFixed(2)}</span></div>
+                `;
+
+            } catch (e) {
+                console.error('Bill Load Error:', e);
+                alert('Error loading bill data');
+            }
+        }
+
+        function downloadPDF() {
+            const element = document.getElementById('billContent');
+            const options = {
+                margin: 15,
+                filename: `Receipt_#${billId}_${new Date().toISOString().split('T')[0]}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().from(element).set(options).save();
+        }
+
+        function shareWhatsApp() {
+            if (!globalBill) return;
+            let message = `*Receipt from {{ hotel_name }}*\n`;
+            message += `Bill ID: #${globalBill.id} | Table: ${globalBill.table_id}\n`;
+            message += `--------------------------\n`;
+            globalBill.items.forEach(it => {
+                message += `${it.name} x ${it.quantity}: ${CURRENCY}${(it.price * it.quantity).toFixed(2)}\n`;
+            });
+            message += `--------------------------\n`;
+            message += `*Total: ${CURRENCY}${globalBill.total.toFixed(2)}*\n`;
+            message += `\nThank you for dining with us! 🙏`;
+
+            const m = globalBill.mobile || '';
+            const encoded = encodeURIComponent(message);
+            window.open(`https://wa.me/${m}?text=${encoded}`, '_blank');
+        }
+
+        loadBill();
+    </script>
+</body>
+
+</html>

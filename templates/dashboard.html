@@ -1,0 +1,2824 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotel Najuka - Dashboard</title>
+    
+    <!-- PWA Mobile App Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#10b981">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+    
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registered successfully.'))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Export Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+
+    <!-- Theme Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v={{ range(1000,9999) | random }}">
+    <style>
+        /* Theme Loader */
+        html {
+            transition: none !important;
+        }
+    </style>
+    <script>
+        // Apply saved theme immediately
+        const savedColor = localStorage.getItem('joy_theme_{{ session.hotel_id }}');
+        if (savedColor) {
+            document.documentElement.style.setProperty('--primary-color', savedColor);
+            // Helper to darken color for hover
+            const adjustColor = (color, amount) => '#' + color.replace(/^#/, '').replace(/../g, color => ('0' + Math.min(255, Math.max(0, parseInt(color, 16) + amount)).toString(16)).substr(-2));
+            document.documentElement.style.setProperty('--primary-hover', adjustColor(savedColor, -20));
+        }
+    </script>
+    <style>
+        /* Financial Dashboard Specific Styles */
+        .financial-grid-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .fin-card {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            transition: transform 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .fin-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .fin-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .revenue-bg {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+        }
+
+        .expense-bg {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+
+        .profit-bg {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .fin-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .fin-info label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .fin-info h2 {
+            margin: 5px 0 0;
+            font-size: 1.8rem;
+            color: var(--text-primary);
+        }
+
+        .trend {
+            font-size: 0.8rem;
+            margin-top: 5px;
+            font-weight: 500;
+        }
+
+        .trend.up {
+            color: #10b981;
+        }
+
+        .trend.down {
+            color: #ef4444;
+        }
+
+        .charts-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 1000px) {
+            .charts-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Help Button Styles */
+        .help-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: linear-gradient(to right, #D4AF37, #B8860B);
+            color: #1e293b;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 10px 15px -3px rgba(212, 175, 55, 0.4);
+            z-index: 1000;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .help-btn:hover {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .help-tooltip {
+            position: fixed;
+            bottom: 6rem;
+            right: 2rem;
+            background: #1e293b;
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            display: none;
+            z-index: 1000;
+            width: 250px;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .chart-container {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        .ledger-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .ledger-table th {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 2px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .ledger-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.95rem;
+        }
+
+        .ledger-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .bg-income {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+        }
+
+        .bg-expense {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+
+        .card-header-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .search-sm {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        /* Custom Alert & Confirm "Window" Styles */
+        .modal-window {
+            max-width: 400px !important;
+        }
+
+        .modal-window .modal-header {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .window-icon {
+            font-size: 3rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .window-title {
+            text-align: center;
+            font-weight: 700;
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .window-message {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+
+        .window-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .res-info-card {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid var(--info-color);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Help System Styles */
+        .help-trigger {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 3.5rem;
+            height: 3.5rem;
+            background: var(--primary-color);
+            color: #0f172a;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .help-trigger:hover {
+            transform: scale(1.1);
+        }
+
+        .guide-step p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Help Info Icon Styles */
+        .info-btn {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            cursor: pointer;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            margin-left: 8px;
+            vertical-align: middle;
+            transition: all 0.2s;
+        }
+
+        .info-btn:hover {
+            background: #10b981;
+            color: white;
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Sidebar overlay for mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- Standing Sidebar -->
+    <div class="dashboard-shell">
+        <nav class="sidebar" id="dashSidebar">
+            <!-- Logo / Brand -->
+            <a href="/" class="sidebar-logo">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+                <span class="hotel-name">{{ session.hotel_name }}</span>
+            </a>
+
+            <!-- Navigation Items -->
+            <div class="sidebar-nav">
+                <span class="sidebar-section-label">Main</span>
+                <button class="sidebar-nav-item active" id="nav-dashboard" onclick="showPage('dashboard', this)">
+                    <span class="nav-icon">🏠</span> Dashboard
+                </button>
+                {% if role in ['owner', 'admin'] %}
+                <button class="sidebar-nav-item" id="nav-financial" onclick="showPage('financial', this)">
+                    <span class="nav-icon">💰</span> Financials
+                </button>
+                {% endif %}
+                <button class="sidebar-nav-item" id="nav-guests" onclick="showPage('guests', this)">
+                    <span class="nav-icon">👥</span> Guests
+                </button>
+                <button class="sidebar-nav-item" id="nav-guest-portal" onclick="showPage('guest-portal', this)">
+                    <span class="nav-icon">📋</span> Guest Portal <span id="portalBadge" style="background:#ef4444;color:white;font-size:0.65rem;padding:2px 6px;border-radius:99px;margin-left:auto;display:none;font-weight:700;">0</span>
+                </button>
+                <button class="sidebar-nav-item" id="nav-calendar" onclick="window.location.href='/calendar'">
+                    <span class="nav-icon">📅</span> Calendar
+                </button>
+                <button class="sidebar-nav-item" id="nav-expenses" onclick="showPage('expenses', this)">
+                    <span class="nav-icon">🧾</span> Expenses
+                </button>
+
+                <span class="sidebar-section-label">Admin</span>
+                {% if role in ['owner', 'admin', 'staff'] %}
+                <button class="sidebar-nav-item" onclick="window.location.href='/settings'">
+                    <span class="nav-icon">⚙️</span> Settings
+                </button>
+                {% endif %}
+                {% if role in ['owner', 'admin'] %}
+                <button class="sidebar-nav-item" id="nav-system" onclick="showPage('system', this)">
+                    <span class="nav-icon">🛡️</span> System
+                </button>
+                {% endif %}
+                {% if session.is_restaurant_active %}
+                <button class="sidebar-nav-item" onclick="window.location.href='/switch_system'"
+                    style="color: #10b981; margin-top: 0.5rem;">
+                    <span class="nav-icon">🥗</span> Restaurant
+                </button>
+                {% endif %}
+            </div>
+
+            <!-- Sidebar Footer -->
+            <div class="sidebar-footer">
+                <div class="sidebar-user">👤 {{ session.username|title }}</div>
+                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode" style="width: 100%; border-radius: 8px; justify-content: center;">🌓 Toggle Theme</button>
+                {% if session.is_super_admin %}
+                <button class="btn btn-primary" onclick="window.location.href='/super_admin'"
+                    style="width: 100%; background: var(--gold); color: #0f172a; font-size: 0.85rem; padding: 0.6rem;">🏰 Master Panel</button>
+                {% else %}
+                <button class="logout-btn" onclick="window.location.href='/logout'" style="width: 100%;">Logout</button>
+                {% endif %}
+            </div>
+        </nav>
+
+        <!-- Content Area -->
+        <div class="sidebar-content">
+            <!-- Slim top bar -->
+            <div class="slim-topbar">
+                <button class="sidebar-toggle-btn" onclick="openSidebar()">☰</button>
+                {% if role in ['owner', 'admin'] %}
+                <button class="nav-btn" onclick="openSupportModal()"
+                    style="color: var(--gold); border: 1px solid rgba(212, 175, 55, 0.3);">💬 Support</button>
+                {% endif %}
+            </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Dashboard Page -->
+        <div id="dashboard" class="page active">
+
+            <!-- (Stats and Room Grid) -->
+            <div class="stats-grid" id="statsGrid" style="display:grid; width: 100%; box-sizing: border-box; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 3rem;">
+                <!-- ... stats ... -->
+                <div class="stat-card">
+                    <div class="stat-icon green">📅</div>
+                    <div class="stat-info">
+                        <h3>Available</h3>
+                        <div class="stat-value" id="availableCount">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon red">🛑</div>
+                    <div class="stat-info">
+                        <h3>Occupied</h3>
+                        <div class="stat-value" id="occupiedCount">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon yellow">🧹</div>
+                    <div class="stat-info">
+                        <h3>Needs Cleaning</h3>
+                        <div class="stat-value" id="dirtyCount">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon blue">📊</div>
+                    <div class="stat-info">
+                        <h3>Occupancy</h3>
+                        <div class="stat-value" id="occupancyRate">0%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-header">
+                <div>
+                    <h1>Room Management <span class="info-btn" onclick="openStaffHelp('rooms')">i</span></h1>
+                    <p>Tap a room to manage booking</p>
+                </div>
+                {% if role in ['owner', 'admin'] %}
+                <button class="btn btn-primary" onclick="window.location.href='/settings'">⚙️ Manage Rooms</button>
+                {% endif %}
+            </div>
+
+            <div class="content-card" style="width: 100%; box-sizing: border-box;">
+                <div class="rooms-grid" id="roomsGrid" style="display:grid; width: 100%; box-sizing: border-box; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1.25rem;">
+                    <!-- Rooms loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Financial Ledger Page -->
+        <div id="financial" class="page">
+            <div class="page-header" style="justify-content: space-between; align-items: start;">
+                <div>
+                    <h1>Financial Ledger <span class="info-btn" onclick="openStaffHelp('finance')">i</span></h1>
+                    <p>Financial performance and transaction history</p>
+                </div>
+                <!-- Date Filter -->
+                <div class="date-filter-group"
+                    style="display: flex; gap: 10px; background: var(--bg-card); padding: 5px; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap;">
+                    <button class="btn btn-sm btn-primary" onclick="showPage('reports-page')">📊 Detailed
+                        Reports</button>
+
+                    <div
+                        style="display: flex; align-items: center; gap: 5px; border-left: 1px solid var(--border-color); padding-left: 10px; margin-left: 5px;">
+                        <input type="date" id="ledgerSpecificDate" class="form-control"
+                            style="width: auto; height: 32px; font-size: 0.8rem; border-color: var(--border-color);">
+                        <button class="btn btn-sm btn-success" onclick="searchLedgerByDate()">🔍 Search Date</button>
+                    </div>
+
+                    <select id="finTimeRange" onchange="updateFinancials()" class="form-control"
+                        style="width: auto; border:none; background:transparent;">
+                        <option value="today">Today</option>
+                        <option value="7days">Last 7 Days</option>
+                        <option value="30days" selected>Last 30 Days</option>
+                        <option value="month">This Month</option>
+                    </select>
+                    <button class="btn btn-sm btn-outline" onclick="exportFinancials()">Download Report 📥</button>
+                </div>
+            </div>
+
+            <div id="financialReport">
+                <!-- Announcement Modal -->
+                <div id="announcementModal" class="modal">
+                    <div class="modal-content" style="border: 2px solid var(--gold); text-align: center;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;" id="announceIcon">📢</div>
+                        <h2 style="color: var(--gold); margin-bottom: 1rem;">System Announcement</h2>
+                        <p id="announceMsg"
+                            style="font-size: 1.1rem; line-height: 1.6; color: #f8fafc; margin-bottom: 2rem;">...</p>
+                        <button class="btn btn-primary"
+                            onclick="document.getElementById('announcementModal').style.display='none'">Okay, Got
+                            it</button>
+                    </div>
+                </div>
+
+                <!-- Scripts -->
+                <div class="financial-grid-cards">
+                    <div class="fin-card">
+                        <div class="fin-icon revenue-bg">₹</div>
+                        <div class="fin-info">
+                            <label>Total Revenue</label>
+                            <h2 id="totalRevenue">₹0</h2>
+                            <span class="trend up" id="revenueTrend">↗ +0%</span>
+                        </div>
+                    </div>
+                    <div class="fin-card">
+                        <div class="fin-icon expense-bg">💸</div>
+                        <div class="fin-info">
+                            <label>Total Expenses</label>
+                            <h2 id="totalExpenses">₹0</h2>
+                            <span class="trend down" id="expenseTrend">↘ +0%</span>
+                        </div>
+                    </div>
+                    <div class="fin-card">
+                        <div class="fin-icon profit-bg">📈</div>
+                        <div class="fin-info">
+                            <label>Net Profit</label>
+                            <h2 id="netProfit">₹0</h2>
+                            <span class="trend up" id="profitTrend">↗ +0% margin</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="charts-row">
+                    <div class="chart-container large">
+                        <div class="chart-header">
+                            <h3>Revenue vs Expenses</h3>
+                        </div>
+                        <div class="canvas-wrapper">
+                            <canvas id="revenueChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-container small">
+                        <div class="chart-header">
+                            <h3>Expense Breakdown</h3>
+                        </div>
+                        <div class="canvas-wrapper">
+                            <canvas id="expenseChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Transactions Ledger -->
+                <div class="content-card">
+                    <div class="card-header-flex">
+                        <h3>Recent Transactions</h3>
+                        <input type="text" placeholder="Search transactions..." class="search-sm"
+                            onkeyup="filterLedger(this)">
+                    </div>
+                    <div class="table-responsive">
+                        <table class="ledger-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Type</th>
+                                    <th>Category</th>
+                                    <th style="text-align: right;">Amount</th>
+                                    <th style="text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ledgerTableBody">
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Reports Page -->
+        <div id="reports-page" class="page">
+            <div class="page-header" style="justify-content: space-between; align-items: start;">
+                <div>
+                    <button class="btn btn-sm" onclick="showPage('financial')" style="margin-bottom: 10px;">← Back to
+                        Ledger</button>
+                    <h1>Detailed Performance Reports <span class="info-btn" onclick="openStaffHelp('reports')">i</span>
+                    </h1>
+                    <p>Monthly & Yearly aggregated financial summaries</p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-sm btn-outline"
+                        onclick="exportToExcel('monthlyTable', 'Monthly_Report')">Export Monthly 📊</button>
+                    <button class="btn btn-sm btn-outline"
+                        onclick="exportToExcel('yearlyTable', 'Yearly_Report')">Export Yearly 📈</button>
+                </div>
+            </div>
+
+            <div class="financial-grid" style="grid-template-columns: 1fr; gap: 2rem;">
+                <!-- Monthly Summary -->
+                <div class="content-card">
+                    <div class="card-header-flex">
+                        <h3>Month-by-Month Summary</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="ledger-table" id="monthlyTable">
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Total Revenue</th>
+                                    <th>Total Expenses</th>
+                                    <th>Net Profit</th>
+                                    <th>Rooms Booked</th>
+                                </tr>
+                            </thead>
+                            <tbody id="monthlyTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Yearly Summary -->
+                <div class="content-card">
+                    <div class="card-header-flex">
+                        <h3>Year-by-Year Summary</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="ledger-table" id="yearlyTable">
+                            <thead>
+                                <tr>
+                                    <th>Year</th>
+                                    <th>Total Revenue</th>
+                                    <th>Total Expenses</th>
+                                    <th>Net Profit</th>
+                                    <th>Rooms Booked</th>
+                                </tr>
+                            </thead>
+                            <tbody id="yearlyTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Guest History Page -->
+        <div id="guests" class="page">
+            <div class="page-header">
+                <h1>Guest History <span class="info-btn" onclick="openStaffHelp('guests')">i</span></h1>
+            </div>
+            <div class="content-card">
+                <div class="search-inputs" style="margin-bottom: 1.5rem;">
+                    <input type="text" id="guestSearchInput" class="form-control"
+                        placeholder="Search by Name, Phone, or Room Number" onkeyup="filterGuests()">
+                    <button class="btn btn-primary" onclick="filterGuests()">Search</button>
+                </div>
+                <div class="table-responsive">
+                    <table id="guestsTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th class="mobile-hide">Phone</th>
+                                <th>Room</th>
+                                <th class="mobile-hide">Check-in</th>
+                                <th class="mobile-hide">Check-out</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="guestsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Calendar Page -->
+        <div id="calendar-page" class="page">
+            <div class="page-header">
+                <h1>Reservation Calendar <span class="info-btn" onclick="openStaffHelp('calendar')">i</span></h1>
+            </div>
+            <div class="content-card">
+                <div id="calendar"></div>
+            </div>
+        </div>
+
+        <!-- Expenses Page -->
+        <div id="expenses" class="page">
+            <div class="page-header">
+                <h1>Expenses <span class="info-btn" onclick="openStaffHelp('expenses')">i</span></h1>
+            </div>
+            <div class="content-card">
+                <h3>Add Expense</h3>
+                <div style="display:flex; gap:1rem; flex-wrap: wrap;">
+                    <input id="expenseName" class="form-control" placeholder="Name" style="flex: 2;">
+                    <input id="expenseAmount" type="number" class="form-control" placeholder="Amount" style="flex: 1;">
+                    <select id="expenseCategory" class="form-control" style="flex: 1;">
+                        <option value="General">General</option>
+                        <option value="Operational">Operational</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Food & Bev">Food & Bev</option>
+                        <option value="Staff">Staff</option>
+                        <option value="Utility">Utility</option>
+                        <option value="Marketing">Marketing</option>
+                    </select>
+                    <button class="btn btn-success" onclick="addExpense()">Add Expense</button>
+                </div>
+            </div>
+            <div class="content-card">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                    <h3>Expense History</h3>
+                    <div class="search-group" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <select id="expenseSearchRange" class="form-control" style="width: auto;"
+                            onchange="updateExpenseSearchUI()">
+                            <option value="all">All Time</option>
+                            <option value="daily">Daily</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="yearly">Yearly</option>
+                        </select>
+                        <input type="date" id="expenseSearchDate" class="form-control"
+                            style="display:none; width: auto;">
+                        <div id="expenseMonthYearGroup" style="display:none; gap: 8px;">
+                            <select id="expenseSearchMonth" class="form-control" style="width: auto;">
+                                <option value="01">January</option>
+                                <option value="02">February</option>
+                                <option value="03">March</option>
+                                <option value="04">April</option>
+                                <option value="05">May</option>
+                                <option value="06">June</option>
+                                <option value="07">July</option>
+                                <option value="08">August</option>
+                                <option value="09">September</option>
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12">December</option>
+                            </select>
+                            <select id="expenseSearchYear" class="form-control" style="width: auto;"></select>
+                        </div>
+                        <select id="expenseSearchYearOnly" class="form-control"
+                            style="display:none; width: auto;"></select>
+                        <button class="btn btn-primary" onclick="runExpenseSearch()">🔍 Search</button>
+                    </div>
+                </div>
+                <div id="expenseList"></div>
+            </div>
+        </div>
+
+        <!-- ========== GUEST PORTAL PAGE ========== -->
+        <div id="guest-portal" class="page">
+            <div class="page-header">
+                <div>
+                    <h1>📋 Guest Portal <span style="font-size:0.7rem; color:var(--text-muted);">/ गेस्ट पोर्टल</span></h1>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">
+                        Guests scan QR → fill details → you approve / मेहमान QR स्कैन करें → जानकारी भरें → आप स्वीकार करें
+                    </p>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
+                <!-- QR Code Card -->
+                <div class="card" style="text-align: center;" id="qrCard">
+                    <h2 style="margin-bottom: 1rem;">🔗 Share QR Code / QR कोड शेयर करें</h2>
+                    <div id="qrCodeContainer" style="background: white; border-radius: 16px; padding: 1.5rem; display: inline-block; margin: 0 auto;"></div>
+                    <p id="qrUrlText" style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.75rem; word-break: break-all;"></p>
+                    <div style="display: flex; gap: 0.75rem; justify-content: center; margin-top: 1rem;">
+                        <button class="btn btn-primary" onclick="downloadQR()" style="font-size: 0.85rem;">
+                            📥 Download QR
+                        </button>
+                        <button class="btn btn-outline" onclick="copyQRLink()" style="font-size: 0.85rem;">
+                            📋 Copy Link
+                        </button>
+                        <a href="/print-standee" target="_blank" class="btn btn-outline" style="font-size: 0.85rem; text-decoration: none; display: flex; align-items: center;">
+                            🖨️ Print Standee
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Instructions Card -->
+                <div class="card">
+                    <h2 style="margin-bottom: 1rem;">📖 How It Works / कैसे काम करता है</h2>
+                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                            <div style="width: 36px; height: 36px; background: rgba(212,175,55,0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700; color: var(--gold);">1</div>
+                            <div>
+                                <strong>Show QR to Guest / मेहमान को QR दिखाएं</strong>
+                                <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 2px;">Print or show this QR code at reception</p>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                            <div style="width: 36px; height: 36px; background: rgba(59,130,246,0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700; color: #3b82f6;">2</div>
+                            <div>
+                                <strong>Guest Fills Form / मेहमान फॉर्म भरेगा</strong>
+                                <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 2px;">They enter name, phone, address & ID photo</p>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                            <div style="width: 36px; height: 36px; background: rgba(16,185,129,0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700; color: #10b981;">3</div>
+                            <div>
+                                <strong>You Accept & Check-in / स्वीकार करें और चेक-इन</strong>
+                                <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 2px;">Assign room, set price → booking created!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pending Requests Section -->
+            <div style="margin-top: 2rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2>📨 Guest Requests / मेहमान अनुरोध</h2>
+                    <button class="btn btn-sm" onclick="loadPortalRequests()" style="font-size: 0.8rem; padding: 0.4rem 1rem;">
+                        🔄 Refresh
+                    </button>
+                </div>
+                <div id="portalRequestsList">
+                    <div style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Accept Check-in Modal -->
+        <div id="acceptCheckinModal" class="modal">
+            <div class="modal-content" style="max-width: 540px; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header">
+                    <h2>✅ Accept & Check-in / स्वीकार करें</h2>
+                    <button class="close-btn" onclick="closeAcceptModal()">&times;</button>
+                </div>
+                <div style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <span style="font-size: 1.5rem;">👤</span>
+                        <div>
+                            <strong id="acceptGuestName" style="font-size: 1.1rem;"></strong>
+                            <div id="acceptGuestPhone" style="color: var(--text-muted); font-size: 0.85rem;"></div>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" id="acceptRequestId">
+
+                <!-- Multiple Rooms Section -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <label style="font-weight: 600;">Rooms / कमरे <span style="color:#ef4444;">*</span></label>
+                    <button type="button" onclick="addRoomRow()" style="background: rgba(212,175,55,0.15); color: var(--primary-color); border: 1px dashed var(--primary-color); border-radius: 8px; padding: 4px 12px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">+ Add Room</button>
+                </div>
+                <div id="roomRowsContainer"></div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; margin-top: 1rem;">
+                    <div class="form-group">
+                        <label style="font-weight: 600; margin-bottom: 0.3rem; display: block;">Check-in / आगमन</label>
+                        <input type="datetime-local" id="acceptCheckinTime" class="form-control" style="width: 100%; padding: 0.7rem;">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight: 600; margin-bottom: 0.3rem; display: block;">Check-out / प्रस्थान</label>
+                        <input type="datetime-local" id="acceptCheckoutTime" class="form-control" style="width: 100%; padding: 0.7rem;">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="confirmAcceptCheckin()" 
+                    style="width: 100%; padding: 0.9rem; font-size: 1.05rem; background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 12px;">
+                    ✅ Check In / चेक-इन करें
+                </button>
+            </div>
+        </div>
+
+        <!-- QR Code JS (CDN) -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+        <!-- System Page (Backup/Restore) -->
+        <div id="system" class="page">
+            <div class="page-header">
+                <div>
+                    <h1>System Maintenance <span class="info-btn" onclick="openStaffHelp('system')">i</span></h1>
+                    <p>Backup and Restore Data</p>
+                </div>
+            </div>
+
+            <div class="financial-cards">
+                <div class="financial-card" style="border-left: 4px solid var(--info-color); margin-bottom: 1.5rem;">
+                    <h3 style="color: var(--text-primary);">Backup Data</h3>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary); margin: 10px 0;">
+                        Download a full backup of your database and guest photos.<br>
+                        <strong>Instructions:</strong><br>
+                        1. Download this file every 2-3 months.<br>
+                        2. Rename it with the date (e.g. <code>backup_oct_2025.zip</code>).<br>
+                        3. Save it securely on your computer.
+                    </p>
+                    <button class="btn btn-primary" onclick="window.location.href='/api/backup'">
+                        ⬇️ Download Backup (Zip)
+                    </button>
+                </div>
+
+                <div class="financial-card" style="border-left: 4px solid var(--danger-color);">
+                    <h3 style="color: var(--text-primary);">Restore Data</h3>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary); margin: 10px 0;">
+                        Upload a backup zip file to restore your system. <br>
+                        <strong style="color: var(--danger-color);">⚠️ WARNING: This will DELETE all current
+                            data!</strong><br>
+                        All current guests, history, and rooms will be VANISHED and replaced with the backup.
+                        Please ensure you have backed up your CURRENT data before restoring an old one.
+                    </p>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <input type="file" id="backupFile" class="form-control" accept=".zip">
+                        <button class="btn btn-danger" onclick="restoreSystem()">Restore System</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Booking Modal -->
+    <div id="bookingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Book Room <span id="modalRoomNumber"></span> <span id="guestStatusBadge"
+                        style="font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; margin-left: 10px;"></span></h2>
+                <button class="close-btn" onclick="closeModal('bookingModal')">&times;</button>
+            </div>
+            <form id="bookingForm" enctype="multipart/form-data">
+                <input type="hidden" id="bookingRoomId" name="room_id">
+
+                <div class="form-group">
+                    <label>Additional Rooms (Group Booking)</label>
+                    <div id="additionalRoomsSection"
+                        style="display: flex; flex-wrap: wrap; gap: 10px; max-height: 80px; overflow-y: auto;">
+                        <!-- Checkboxes loaded dynamically -->
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Guest Name</label>
+                        <input type="text" id="guestName" name="guest_name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input type="tel" id="guestPhone" name="phone" class="form-control" required
+                            onblur="searchGuest()">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Address</label>
+                    <textarea id="guestAddress" name="address" rows="1" class="form-control" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Additional Members <span style="font-size: 0.8rem; color: #94a3b8;">(Optional)</span></label>
+                    <div id="dashboardMembersContainer"></div>
+                    <button type="button" class="btn btn-outline" onclick="addDashboardMemberField()" style="margin-top: 0.5rem; padding: 0.2rem 0.5rem; font-size: 0.8rem;">
+                        + Add Member
+                    </button>
+                    <input type="hidden" name="members" id="dashboardMembersInput" value="[]">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>ID Number</label>
+                        <input type="text" id="guestId" name="id_number" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Room Amount (₹)</label>
+                        <input type="number" id="roomAmount" name="amount" class="form-control" required>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>ID Photos</label>
+                        <input type="file" id="idPhoto" name="id_photos" class="form-control" accept="image/*" multiple
+                            style="padding: 4px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Check-in Time</label>
+                        <input type="datetime-local" id="checkinTime" name="checkin_time" class="form-control" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 0.5rem;">Confirm
+                    Booking</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div id="checkoutModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Checkout <span id="checkoutRoomNumber"></span></h2>
+                <button class="close-btn" onclick="closeModal('checkoutModal')">&times;</button>
+            </div>
+            <div id="checkoutGuestInfo"
+                style="margin-bottom: 1.5rem; padding: 1rem; background: var(--bg-body); border-radius: var(--radius-md); font-size: 0.9rem;">
+            </div>
+            <form id="checkoutForm">
+                <input type="hidden" id="checkoutBookingId">
+                <div class="form-group">
+                    <label>Checkout Time</label>
+                    <input type="datetime-local" id="checkoutTime" class="form-control" required>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Food (₹)</label>
+                        <input type="number" id="foodCharges" class="form-control" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Laundry (₹)</label>
+                        <input type="number" id="laundryCharges" class="form-control" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Water (₹)</label>
+                        <input type="number" id="waterBottleCharges" class="form-control" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Car Wash (₹)</label>
+                        <input type="number" id="carWashCharges" class="form-control" value="0">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-danger" style="width: 100%; margin-top: 1rem;">Process
+                    Checkout</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Guest Profile Modal -->
+    <div id="guestProfileModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Guest Info</h2>
+                <button class="close-btn" onclick="closeModal('guestProfileModal')">&times;</button>
+            </div>
+            <div id="guestProfileContent"></div>
+        </div>
+    </div>
+
+    <!-- Manage Reservation Modal -->
+    <div id="manageReservationModal" class="modal">
+        <div class="modal-content modal-window">
+            <div class="modal-header" style="justify-content: flex-end;">
+                <button class="close-btn" onclick="closeModal('manageReservationModal')">&times;</button>
+            </div>
+            <div class="window-icon">📅</div>
+            <div class="window-title">Manage Reservation</div>
+            <div class="window-message">
+                <div class="res-info-card">
+                    <strong>Guest:</strong> <span id="resGuestName"></span><br>
+                    <strong>Status:</strong> Reserved
+                </div>
+                What would you like to do with this reservation?
+            </div>
+            <div class="window-footer">
+                <button class="btn btn-success" onclick="proceedCheckInFromRes()">Check-in Now</button>
+                <button class="btn btn-outline" onclick="cancelReservation()"
+                    style="color: var(--danger-color); border-color: var(--danger-color);">Cancel Reservation</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Room Modal -->
+    <div id="addRoomModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New Room</h2>
+                <button class="close-btn" onclick="closeModal('addRoomModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>Room Number</label>
+                <input type="text" id="newRoomId" class="form-control" placeholder="e.g. 101">
+            </div>
+            <div class="form-group">
+                <label>Room Type</label>
+                <select id="newRoomType" class="form-control">
+                    <option value="Standard">Standard</option>
+                    <option value="Deluxe">Deluxe</option>
+                    <option value="Suite">Suite</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="addNewRoom()">Add
+                Room</button>
+        </div>
+    </div>
+
+    <!-- Conflict/Override Modal -->
+    <div id="conflictModal" class="modal">
+        <div class="modal-content modal-window">
+            <div class="window-icon" style="color: var(--warning-color);">⚠️</div>
+            <div class="window-title">Room Conflict</div>
+            <div class="window-message" id="conflictMessage"></div>
+            <div class="window-footer">
+                <button class="btn btn-outline" onclick="closeModal('conflictModal')">Cancel</button>
+                <button class="btn btn-danger" id="overrideBtn">Override & Book</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Staff Help Modal -->
+    <div id="staffHelpModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 id="helpTitle">📖 JoyHotels Staff Guide</h2>
+                <button class="close-btn" onclick="closeModal('staffHelpModal')">&times;</button>
+            </div>
+
+            <div id="helpContent" style="max-height: 60vh; overflow-y: auto; padding-right: 10px;">
+                <!-- Full guide as fallback -->
+                <div id="fullGuide">
+                    <div class="guide-step">
+                        <h4>🗝️ How to Check-In a Guest</h4>
+                        <p>1. Tap any <strong>Green (Available)</strong> room card.<br>
+                            2. <strong>Search First:</strong> Enter their phone number; if they've stayed before, their
+                            details will auto-fill.<br>
+                            3. <strong>Identity:</strong> Take a clear photo of their ID. You can upload multiple images
+                            (Front & Back).<br>
+                            4. <strong>Group Booking:</strong> If they need more rooms, select them in the "Additional
+                            Rooms" section before saving.</p>
+                    </div>
+
+                    <div class="guide-step">
+                        <h4>💳 Managing Payments & Checkout</h4>
+                        <p>1. Tap a <strong>Red (Occupied)</strong> room card to see the bill.<br>
+                            2. <strong>Extra Charges:</strong> Add food, laundry, or water charges as they occur during
+                            the
+                            stay.<br>
+                            3. <strong>Check-out:</strong> Verify all charges with the guest, then tap "Process
+                            Checkout".
+                            The room will automatically turn Yellow (Dirty).</p>
+                    </div>
+
+                    <div class="guide-step">
+                        <h4>🧹 Cleaning & Housekeeping</h4>
+                        <p>Rooms that turn <strong>Yellow (Dirty)</strong> are ready for cleaning. Housekeepers can tap
+                            the
+                            room card to change the status to "Cleaning..." and finally to "Clean" when the room is
+                            sanitized and ready for the next guest.</p>
+                    </div>
+
+                    <div class="guide-step">
+                        <h4>📊 Financials & Reports</h4>
+                        <p>Managers can use the <strong>Financials</strong> tab to view a visual breakdown of revenue vs
+                            expenses. Click <strong>"Detailed Reports"</strong> to export monthly or yearly Excel/PDF
+                            files
+                            for accounting.</p>
+                    </div>
+
+                    <div class="guide-step">
+                        <h4>📅 Reservation Calendar</h4>
+                        <p>Use the **Calendar** to plan for future arrivals. If a guest wants to change their date, you
+                            can
+                            click their name on the calendar to see options or drag their entry to a new date.</p>
+                    </div>
+
+                    <div class="guide-step">
+                        <h4>📥 Support & Contact Support Team</h4>
+                        <p>If you face any issues or need urgent assistance, please contact the support team:</p>
+                        <ul>
+                            <li>📞 <b>Phone</b>: 8956364864</li>
+                            <li>📧 <b>Email</b>: joyhotels500@gmail.com</li>
+                        </ul>
+                        <p>You can also go to **Settings > Support** to send a direct message to the Super Admin panel.
+                        </p>
+                    </div>
+
+                    <div class="guide-step">
+                        <h4>🛡️ System Maintenance</h4>
+                        <p>Important: Managers should go to the <strong>System</strong> tab every few months to download
+                            a
+                            <strong>Security Backup</strong>. This keeps your data safe even if your device is lost.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary btn-full" style="margin-top: 1.5rem;"
+                onclick="closeModal('staffHelpModal')">Got it, thanks!</button>
+        </div>
+    </div>
+
+    <div class="help-trigger" onclick="document.getElementById('staffHelpModal').classList.add('show')">i</div>
+
+    <!-- Custom Alert Modal -->
+    <div id="customAlert" class="modal">
+        <div class="modal-content modal-window">
+            <div id="alertIcon" class="window-icon"></div>
+            <div id="alertTitle" class="window-title"></div>
+            <div id="alertMessage" class="window-message"></div>
+            <div class="window-footer">
+                <button class="btn btn-primary" style="min-width: 120px;"
+                    onclick="closeModal('customAlert')">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="customConfirm" class="modal">
+        <div class="modal-content modal-window">
+            <div class="window-icon" style="color: var(--info-color);">❓</div>
+            <div id="confirmTitle" class="window-title">Are you sure?</div>
+            <div id="confirmMessage" class="window-message"></div>
+            <div class="window-footer">
+                <button id="confirmYes" class="btn btn-primary">Yes, Proceed</button>
+                <button class="btn btn-outline" onclick="closeModal('customConfirm')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Core Application State ---
+        let currentRoom = null;
+        let allRooms = [];
+        let calendarInstance = null;
+        let revenueChartInstance = null; // For financial charts
+        let expenseChartInstance = null; // For financial charts
+        let selectedReservedRoom = null; // For room management
+        // --- Global State Vars ---
+        window.forceOverrideBooking = false;
+        window.pendingOverrideType = null;
+        window.pendingRoomOverride = false;
+        window.targetRoom = null;
+        window.pendingForceOverride = false;
+        window.checkoutRoomId = null;
+        window.checkoutBookingId = null;
+
+        /**
+         * Custom Modal Popups
+         */
+        window.showAlert = function (title, message, type = 'info') {
+            const icons = { info: 'ℹ️', success: '✅', error: '❌', warning: '⚠️' };
+            document.getElementById('alertIcon').textContent = icons[type] || icons.info;
+            document.getElementById('alertTitle').textContent = title;
+            document.getElementById('alertMessage').textContent = message;
+            document.getElementById('customAlert').classList.add('show');
+        };
+
+        window.showConfirm = function (title, message, callback) {
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmMessage').textContent = message;
+            const yesBtn = document.getElementById('confirmYes');
+            // Remove previous listeners
+            const newBtn = yesBtn.cloneNode(true);
+            yesBtn.parentNode.replaceChild(newBtn, yesBtn);
+            newBtn.onclick = () => {
+                closeModal('customConfirm');
+                callback();
+            };
+            document.getElementById('customConfirm').classList.add('show');
+        };
+
+        const helpDocs = {
+            'rooms': {
+                title: 'Room Management Guide',
+                content: `
+                    <h4>🗝️ How to Check-In</h4>
+                    <ul>
+                        <li><b>Green Cards</b>: Available rooms. Tap one to start a booking.</li>
+                        <li><b>Red Cards</b>: Occupied. Tap to view bill or add charges.</li>
+                        <li><b>ID Photos</b>: Always take clear photos of Guest ID (Front/Back).</li>
+                        <li><b>Groups</b>: Use "Additional Rooms" to book multiple rooms for one guest.</li>
+                    </ul>
+                `
+            },
+            'finance': {
+                title: 'Financial Ledger Guide',
+                content: `
+                    <h4>📊 Understanding Finances</h4>
+                    <ul>
+                        <li><b>Revenue</b>: Total money collected from bookings and services.</li>
+                        <li><b>Expenses</b>: Total spent on utilities, salaries, etc.</li>
+                        <li><b>Filters</b>: Use the top bar to filter by Date, Month, or Year.</li>
+                    </ul>
+                `
+            },
+            'reports': {
+                title: 'Performance Reports Guide',
+                content: `
+                    <h4>📑 Detailed Analytics</h4>
+                    <ul>
+                        <li><b>Aggregations</b>: View monthly and yearly growth charts.</li>
+                        <li><b>Export</b>: Click 'Export Excel' or 'Export PDF' to download reports for accounting.</li>
+                    </ul>
+                `
+            },
+            'guests': {
+                title: 'Guest History Guide',
+                content: `
+                    <h4>👥 Managing Guests</h4>
+                    <ul>
+                        <li><b>Search</b>: Find any guest using their phone number.</li>
+                        <li><b>Edit Profile</b>: Update contact details or ID info by tapping the pencil icon.</li>
+                        <li><b>Status</b>: Track 'Regular' vs 'New' guests automatically.</li>
+                    </ul>
+                `
+            },
+            'expenses': {
+                title: 'Expense Tracker Guide',
+                content: `
+                    <h4>💸 Managing Spend</h4>
+                    <ul>
+                        <li><b>Add Expense</b>: Log every spend (Salaries, Water, Electricity).</li>
+                        <li><b>Categories</b>: Group expenses to see where money is going.</li>
+                        <li><b>Delete</b>: Remove accidental entries using the red delete button.</li>
+                    </ul>
+                `
+            },
+            'calendar': {
+                title: 'Reservation Calendar Guide',
+                content: `
+                    <h4>📅 Planning Ahead</h4>
+                    <ul>
+                        <li><b>Future Bookings</b>: Check upcoming arrivals at a glance.</li>
+                        <li><b>Drag & Drop</b>: Easily change guest stay dates by dragging their name.</li>
+                    </ul>
+                `
+            },
+            'support': {
+                title: 'Support Team Contact',
+                content: `
+                    <h4>📥 Get Assistance</h4>
+                    <p>If you face any issues, contact the support team:</p>
+                    <ul>
+                        <li>📞 <b>Phone</b>: 8956364864</li>
+                        <li>📧 <b>Email</b>: joyhotels500@gmail.com</li>
+                    </ul>
+                    <p>Technician help is available 24/7 via the Settings > Support panel.</p>
+                `
+            },
+            'system': {
+                title: 'System Maintenance',
+                content: `
+                    <h4>🛡️ Data Security</h4>
+                    <ul>
+                        <li><b>Backups</b>: Download your database monthly to keep data safe.</li>
+                        <li><b>Announcements</b>: Check the top banner for system updates.</li>
+                    </ul>
+                `
+            }
+        };
+
+        window.openStaffHelp = function (section) {
+            const doc = helpDocs[section];
+            const titleEl = document.getElementById('helpTitle');
+            const contentEl = document.getElementById('helpContent');
+
+            if (doc) {
+                titleEl.textContent = '📖 ' + doc.title;
+                contentEl.innerHTML = doc.content;
+            } else {
+                titleEl.textContent = '📖 JoyHotels Staff Guide';
+                contentEl.innerHTML = document.getElementById('fullGuide').outerHTML;
+            }
+            document.getElementById('staffHelpModal').classList.add('show');
+        };
+
+
+        // --- Initialization ---
+        // Check for Announcements
+        async function checkAnnouncements() {
+            try {
+                const res = await fetch('/api/public/announcement');
+                const data = await res.json();
+                if (data.has_announcement) {
+                    document.getElementById('announceMsg').innerText = data.message;
+                    const icons = { 'info': '📢', 'warning': '⚠️', 'success': '🎉' };
+                    document.getElementById('announceIcon').innerText = icons[data.type] || '📢';
+                    document.getElementById('announcementModal').style.display = 'flex';
+                }
+            } catch (e) { console.log('No announcements'); }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Restore theme
+            const savedTheme = localStorage.getItem('joy_theme_{{ session.hotel_id }}');
+            if (savedTheme) applyTheme(savedTheme);
+
+            // Check Announce
+            checkAnnouncements();
+            // Set initial page
+            showPage('dashboard');
+        });
+
+        // --- Navigation ---
+        function showPage(pageId) {
+            // Hide all pages, show selected
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            const targetPage = document.getElementById(pageId);
+            if (targetPage) targetPage.classList.add('active');
+
+            // Update nav buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+                // Highlight button based on the pageId it triggers
+                const onClickStr = btn.getAttribute('onclick') || '';
+                if (onClickStr.includes(`showPage('${pageId}')`)) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Specific page loading logic
+            if (pageId === 'dashboard') loadRooms();
+            else if (pageId === 'financial') updateFinancials();
+            else if (pageId === 'guests') loadGuests();
+            else if (pageId === 'calendar-page') loadCalendar();
+            else if (pageId === 'expenses') loadExpenses();
+            else if (pageId === 'reports-page') loadReports();
+            else if (pageId === 'system') { /* No specific load function needed for system page */ }
+        }
+
+        // --- Theme Management ---
+        function applyTheme(theme) {
+            document.body.setAttribute('data-theme', theme);
+            const btn = document.querySelector('.theme-toggle');
+            if (btn) btn.textContent = theme === 'dark' ? '🌓' : '☀️';
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.body.getAttribute('data-theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            applyTheme(newTheme);
+            localStorage.setItem('joy_theme_{{ session.hotel_id }}', newTheme);
+        }
+
+        // --- Export & Printing ---
+        function exportToExcel(elementId, fileName) {
+            const table = document.getElementById(elementId);
+            // Used simple SheetJS extraction
+            const wb = XLSX.utils.table_to_book(table || document.querySelector(`#${elementId} table`), { sheet: "Sheet 1" });
+            XLSX.writeFile(wb, `${fileName}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        }
+
+        function exportToPDF(elementId, fileName) {
+            const element = document.getElementById(elementId);
+            const opt = {
+                margin: 10,
+                filename: `${fileName}_${new Date().toISOString().slice(0, 10)}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save();
+        }
+
+        // --- Room Management ---
+        async function loadRooms() {
+            try {
+                const response = await fetch('/api/rooms');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                allRooms = await response.json();
+
+                const grid = document.getElementById('roomsGrid');
+                if (!grid) return; // Exit if roomsGrid is not on the current page
+                grid.innerHTML = '';
+
+                let stats = { available: 0, occupied: 0, dirty: 0, reserved: 0, total: allRooms.length };
+
+                if (!allRooms || allRooms.length === 0) {
+                    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--text-secondary);">No rooms found. Add a room to get started!</div>';
+                }
+
+                allRooms.forEach(room => {
+                    const status = room.status || 'available';
+                    if (stats.hasOwnProperty(status)) {
+                        stats[status]++;
+                    } else {
+                        stats.available++; // Default to available if status is unknown
+                    }
+
+                    const card = document.createElement('div');
+                    card.className = `room-card ${status}`;
+                    card.onclick = () => handleRoomClick(room);
+
+                    card.innerHTML = `
+                        <div class="room-number">${room.room_id}</div>
+                        <div class="room-type">${room.room_type || 'Standard'}</div>
+                        <div class="room-status" style="${status === 'reserved' ? 'color:#3b82f6' : ''}">
+                            ${status.charAt(0).toUpperCase() + status.slice(1)}
+                        </div>
+                        ${(status === 'occupied' || status === 'reserved') ?
+                            `<div style="font-size: 0.8rem; margin-top: 5px; color: var(--text-primary);">👤 ${room.guest_name || 'Guest'}</div>` : ''}
+                    `;
+                    grid.appendChild(card);
+                });
+
+                // Update Top Stats
+                if (document.getElementById('availableCount')) document.getElementById('availableCount').textContent = stats.available;
+                if (document.getElementById('occupiedCount')) document.getElementById('occupiedCount').textContent = stats.occupied;
+                if (document.getElementById('dirtyCount')) document.getElementById('dirtyCount').textContent = stats.dirty;
+
+                const occupancyRate = stats.total > 0 ? Math.round((stats.occupied / stats.total) * 100) : 0;
+                if (document.getElementById('occupancyRate')) document.getElementById('occupancyRate').textContent = `${occupancyRate}%`;
+
+            } catch (error) {
+                console.error('Error loading rooms:', error);
+                showAlert('Warning', 'Failed to load rooms. Please check your connection.', 'warning');
+            }
+        }
+
+        function handleRoomClick(room) {
+            if (room.status === 'available') openBookingModal(room);
+            else if (room.status === 'reserved') {
+                selectedReservedRoom = room;
+                document.getElementById('resGuestName').textContent = room.guest_name;
+                document.getElementById('manageReservationModal').classList.add('show');
+            }
+            else if (room.status === 'occupied') {
+                if (room.booking_id) openCheckoutModal(room);
+                else showAlert('Error', 'Room marked occupied but no booking ID found.', 'error');
+            }
+            else if (room.status === 'dirty') {
+                showConfirm('Room Cleaning', `Mark Room ${room.room_id} as Clean?`, () => cleanRoom(room.room_id));
+            }
+        }
+
+        async function cleanRoom(roomId) {
+            try {
+                const response = await fetch(`/api/clean-room/${roomId}`, { method: 'POST' });
+                const result = await response.json();
+                if (result.success) loadRooms();
+            } catch (error) { console.error('Error cleaning room:', error); }
+        }
+
+        async function addNewRoom() {
+            const roomId = document.getElementById('newRoomId').value;
+            const roomType = document.getElementById('newRoomType').value;
+
+            if (!roomId) return alert('Enter Room Number');
+
+            try {
+                const response = await fetch('/api/rooms/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ room_id: roomId, room_type: roomType, force_override: window.pendingRoomOverride || false })
+                });
+
+                const result = await response.json();
+
+                if (result.requires_confirmation) {
+                    document.getElementById('conflictMessage').textContent = result.message;
+                    document.getElementById('conflictModal').classList.add('show');
+                    window.pendingRoomOverride = true; // Use a specific flag for room override
+                    return;
+                }
+
+                if (result.success) {
+                    closeModal('addRoomModal');
+                    loadRooms();
+                    document.getElementById('newRoomId').value = '';
+                    window.pendingRoomOverride = false;
+                } else {
+                    showAlert('Error', result.message, 'error');
+                }
+            } catch (e) {
+                console.error(e);
+                showAlert('Error', 'Error adding room', 'error');
+            }
+        }
+
+        function proceedCheckInFromRes() {
+            closeModal('manageReservationModal');
+            if (selectedReservedRoom) {
+                window.forceOverrideBooking = true;
+                openBookingModal(selectedReservedRoom);
+                // Force pre-fill name after modal opens (small delay to ensure DOM update)
+                setTimeout(() => {
+                    const nameInput = document.getElementById('guestName');
+                    if (nameInput) {
+                        nameInput.value = selectedReservedRoom.guest_name;
+                        // Also try to fetch guest details if phone matches
+                        // selectedReservedRoom might not have phone, usually reservations are made by name first
+                    }
+                }, 100);
+            }
+        }
+
+        async function cancelReservation() {
+            showConfirm('Cancel Reservation', 'Are you sure you want to CANCEL this reservation? This cannot be undone.', async () => {
+                try {
+                    const response = await fetch('/api/reserve', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            room_id: selectedReservedRoom.room_id,
+                            guest_name: selectedReservedRoom.guest_name
+                        })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        closeModal('manageReservationModal');
+                        loadRooms();
+                    } else {
+                        showAlert('Error', result.message, 'error');
+                    }
+                } catch (e) { console.error(e); }
+            });
+        }
+
+        // --- Booking Flow ---
+        function openBookingModal(room) {
+            window.targetRoom = room; // Store target room globally for form submission
+            // Only reset if NOT coming from the reservation flow
+            if (!window.forceOverrideBooking) window.forceOverrideBooking = false;
+
+            document.getElementById('bookingRoomId').value = room.room_id;
+            document.getElementById('modalRoomNumber').textContent = room.room_id;
+            document.getElementById('bookingForm').reset();
+            document.getElementById('guestStatusBadge').textContent = '';
+            document.getElementById('guestStatusBadge').style.backgroundColor = 'transparent';
+
+            // Populate Additional Rooms
+            const container = document.getElementById('additionalRoomsSection');
+            container.innerHTML = '';
+
+            allRooms.forEach(r => {
+                // Only show available rooms that are not the current room
+                if (r.status === 'available' && r.room_id !== room.room_id) {
+                    const div = document.createElement('div');
+                    div.innerHTML = `
+                        <input type="checkbox" name="additional_rooms" value="${r.room_id}" id="room_${r.room_id}">
+                        <label for="room_${r.room_id}">${r.room_id}</label>
+                    `;
+                    container.appendChild(div);
+                }
+            });
+
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('checkinTime').value = now.toISOString().slice(0, 16);
+            document.getElementById('bookingModal').classList.add('show');
+        }
+
+        async function searchGuest() {
+            const phone = document.getElementById('guestPhone').value;
+            if (phone.length < 3) return;
+
+            try {
+                const response = await fetch(`/api/guests/search?phone=${phone}`);
+                const guest = await response.json();
+
+                if (guest) {
+                    document.getElementById('guestName').value = guest.name;
+                    document.getElementById('guestAddress').value = guest.address;
+                    document.getElementById('guestId').value = guest.id_number;
+
+                    const badge = document.getElementById('guestStatusBadge');
+                    badge.textContent = guest.status.toUpperCase();
+                    if (guest.status === 'vip') {
+                        badge.style.backgroundColor = '#fcd34d'; // Yellow
+                        badge.style.color = '#78350f';
+                    } else {
+                        badge.style.backgroundColor = '#e5e7eb'; // Grey
+                        badge.style.color = '#374151';
+                    }
+                }
+            } catch (error) { console.error('Error searching guest:', error); }
+        }
+
+        function addDashboardMemberField() {
+            const container = document.getElementById('dashboardMembersContainer');
+            const index = container.children.length + 1;
+            const inputHTML = `
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <input type="text" class="form-control dashboard-member-name" placeholder="Member ${index} Name" required>
+                    <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1.2rem;">❌</button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', inputHTML);
+        }
+
+        document.getElementById('bookingForm').onsubmit = async (e) => {
+            e.preventDefault();
+            await submitBooking(e);
+        };
+
+        async function submitBooking(e) {
+            const form = document.getElementById('bookingForm');
+
+            // Gather additional members
+            const memberInputs = document.querySelectorAll('.dashboard-member-name');
+            const membersList = Array.from(memberInputs).map(inp => inp.value.trim()).filter(val => val !== '');
+            document.getElementById('dashboardMembersInput').value = JSON.stringify(membersList);
+
+            const formData = new FormData(form);
+
+            // Handle multiple rooms
+            const selectedRooms = [document.getElementById('bookingRoomId').value];
+            document.querySelectorAll('input[name="additional_rooms"]:checked').forEach(cb => {
+                selectedRooms.push(cb.value);
+            });
+            formData.append('room_ids', selectedRooms.join(','));
+
+            if (window.forceOverrideBooking) {
+                formData.append('force_override', 'true');
+            }
+
+            try {
+                const response = await fetch('/api/book', { method: 'POST', body: formData });
+                const result = await response.json();
+
+                if (result.requires_confirmation) {
+                    document.getElementById('conflictMessage').textContent = result.message;
+                    document.getElementById('conflictModal').classList.add('show');
+                    window.pendingOverrideType = 'booking';
+                    return;
+                }
+
+                if (result.success) {
+                    closeModal('bookingModal');
+                    loadRooms();
+                    loadFinancials();
+                    form.reset();
+                    window.forceOverrideBooking = false;
+                    showAlert('Success', 'Booking Successful! 📅', 'success');
+                } else {
+                    showAlert('Booking Failed', result.message || 'Unknown error', 'error');
+                }
+            } catch (error) { console.error('Error booking room:', error); }
+        }
+
+        function confirmOverride() {
+            closeModal('conflictModal');
+
+            if (window.pendingRoomOverride) {
+                window.pendingRoomOverride = false; // Reset flag
+                addNewRoom(); // Retry adding room with override
+            }
+            else if (window.pendingOverrideType === 'booking') {
+                window.forceOverrideBooking = true; // Set flag for booking
+                submitBooking(); // Retry booking with override
+                window.pendingOverrideType = null;
+            }
+        }
+
+        // --- Checkout Flow ---
+        async function openCheckoutModal(room) {
+            if (!room.booking_id) return;
+            try {
+                const response = await fetch(`/api/booking/${room.booking_id}`);
+                const booking = await response.json();
+                document.getElementById('checkoutBookingId').value = booking.id;
+                document.getElementById('checkoutRoomNumber').textContent = room.room_id; // Display current room, but checkout will clear all
+                document.getElementById('checkoutGuestInfo').innerHTML = `
+                    <p><strong>Guest:</strong> ${booking.guest_name}</p>
+                    <p><strong>Check-in:</strong> ${booking.checkin_time}</p>
+                    <p><strong>Initial:</strong> ₹${booking.amount}</p>
+                `;
+                const now = new Date();
+                now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+                document.getElementById('checkoutTime').value = now.toISOString().slice(0, 16);
+                document.getElementById('checkoutForm').reset();
+                document.getElementById('checkoutModal').classList.add('show');
+            } catch (error) { console.error('Error details:', error); }
+        }
+
+        document.getElementById('checkoutForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const data = {
+                booking_id: document.getElementById('checkoutBookingId').value,
+                checkout_time: document.getElementById('checkoutTime').value,
+                food: parseFloat(document.getElementById('foodCharges').value) || 0,
+                laundry: parseFloat(document.getElementById('laundryCharges').value) || 0,
+                water_bottle: parseFloat(document.getElementById('waterBottleCharges').value) || 0,
+                car_wash: parseFloat(document.getElementById('carWashCharges').value) || 0
+            };
+            try {
+                const response = await fetch('/api/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    closeModal('checkoutModal');
+                    loadRooms();
+                    loadFinancials();
+                    showAlert('Success', 'Checkout Complete!', 'success');
+                } else {
+                    showAlert('Error', result.message, 'error');
+                }
+            } catch (error) { console.error('Error checking out:', error); }
+        };
+
+        // --- Financials & Analytics ---
+        async function updateFinancials(date = null) {
+            const range = document.getElementById('finTimeRange').value || '30days';
+            let url = `/api/financials/ledger?range=${range}`;
+            if (date) url = `/api/financials/ledger?date=${date}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                // 1. Update KPI Cards
+                if (document.getElementById('totalRevenue')) document.getElementById('totalRevenue').textContent = `₹${data.revenue.toLocaleString()}`;
+                if (document.getElementById('totalExpenses')) document.getElementById('totalExpenses').textContent = `₹${data.expenses.toLocaleString()}`;
+                if (document.getElementById('netProfit')) document.getElementById('netProfit').textContent = `₹${data.profit.toLocaleString()}`;
+
+                // 2. Render Charts
+                renderCharts(data);
+
+                // 3. Populate Ledger Table
+                loadFinancialEntries(data.transactions);
+
+            } catch (error) {
+                console.error('Error loading financials:', error);
+                showAlert('Error', 'Failed to load financial data.', 'error');
+            }
+        }
+
+        function renderCharts(data) {
+            const ctxRev = document.getElementById('revenueChart');
+            const ctxExp = document.getElementById('expenseChart');
+
+            if (ctxRev && data.chart_labels) {
+                if (revenueChartInstance) revenueChartInstance.destroy();
+                revenueChartInstance = new Chart(ctxRev.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: data.chart_labels,
+                        datasets: [
+                            {
+                                label: 'Revenue',
+                                data: data.chart_revenue,
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Expenses',
+                                data: data.chart_expenses,
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: true, position: 'top' } },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: 'rgba(128, 128, 128, 0.1)' } },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
+            }
+
+            if (ctxExp && data.expense_breakdown) {
+                if (expenseChartInstance) expenseChartInstance.destroy();
+                expenseChartInstance = new Chart(ctxExp.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(data.expense_breakdown),
+                        datasets: [{
+                            data: Object.values(data.expense_breakdown),
+                            backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom' } },
+                        cutout: '70%'
+                    }
+                });
+            }
+        }
+
+        function loadFinancialEntries(transactions) {
+            const tbody = document.getElementById('ledgerTableBody');
+            if (!tbody) return;
+
+            tbody.innerHTML = transactions.map(t => `
+                <tr>
+                    <td>${t.date}</td>
+                    <td>${t.description}</td>
+                    <td><span class="badge ${t.type === 'income' ? 'bg-income' : 'bg-expense'}">${t.type.toUpperCase()}</span></td>
+                    <td>${t.category}</td>
+                    <td style="text-align: right; font-weight: 600; color: ${t.type === 'income' ? 'var(--success-color)' : 'var(--danger-color)'}">
+                        ${t.type === 'income' ? '+' : '-'}₹${t.amount.toLocaleString()}
+                    </td>
+                    <td style="text-align: center;">
+                        ${t.type === 'income' ? `<button class="btn btn-sm btn-primary" style="padding: 2px 8px; font-size: 0.75rem;" onclick="viewGuest(${t.id})">👤 View Profile</button>` : '-'}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function searchLedgerByDate() {
+            const date = document.getElementById('ledgerSpecificDate').value;
+            if (!date) {
+                showAlert('Error', 'Please select a date first', 'warning');
+                return;
+            }
+            updateFinancials(date);
+        }
+
+        async function viewGuestProfile(bookingId) {
+            try {
+                const response = await fetch(`/api/guest/${bookingId}`);
+                if (!response.ok) throw new Error('Guest not found');
+                const guest = await response.json();
+
+                // Reuse the guest detail modal or similar logic
+                // For now, let's use the standard detail view pattern
+                // If we have a dedicated guestModal, use that. 
+                // Let's check how guests are viewed in the "Guest History" page.
+
+                // For simplicity, let's show an alert with details or open the bill page
+                // But the user asked for a "View Profile" which usually means details.
+
+                // We'll show the info in a custom modal if possible.
+                // Let's assume we can use showPage('guests') and highlight them? 
+                // No, a modal is better.
+
+                // Let's implement a quick detail modal for this.
+                showAlert(`Guest Profile: ${guest.guest_name}`, `
+                    <b>Phone:</b> ${guest.phone}<br>
+                    <b>Room:</b> ${guest.room_id}<br>
+                    <b>Address:</b> ${guest.address}<br>
+                    <b>Check-in:</b> ${guest.checkin_time}<br>
+                    <b>Status:</b> ${guest.status || 'Regular'}<br>
+                    <hr>
+                    <button class="btn btn-sm btn-primary" onclick="window.location.href='/bill/${bookingId}'">🧾 View Full Bill</button>
+                `, 'info');
+
+            } catch (error) {
+                console.error('Error fetching guest profile:', error);
+                showAlert('Error', 'Could not load guest profile', 'error');
+            }
+        }
+
+        async function loadReports() {
+            try {
+                const response = await fetch('/api/reports');
+                const data = await response.json();
+
+                const mBody = document.getElementById('monthlyTableBody');
+                if (mBody) {
+                    mBody.innerHTML = (data.monthly || []).map(m => `
+                        <tr>
+                            <td><strong>${m.period}</strong></td>
+                            <td style="color: var(--success-color); font-weight:600;">₹${m.revenue.toLocaleString()}</td>
+                            <td style="color: var(--danger-color);">₹${m.expenses.toLocaleString()}</td>
+                            <td style="font-weight:700; color: ${m.profit >= 0 ? 'var(--success-color)' : 'var(--danger-color)'}">₹${m.profit.toLocaleString()}</td>
+                            <td><span class="badge bg-info" style="background:var(--info-color); color:white;">${m.rooms_booked} Rooms</span></td>
+                        </tr>
+                    `).join('');
+                }
+
+                const yBody = document.getElementById('yearlyTableBody');
+                if (yBody) {
+                    yBody.innerHTML = (data.yearly || []).map(y => `
+                        <tr>
+                            <td><strong>${y.period}</strong></td>
+                            <td style="color: var(--success-color); font-weight:600;">₹${y.revenue.toLocaleString()}</td>
+                            <td style="color: var(--danger-color);">₹${y.expenses.toLocaleString()}</td>
+                            <td style="font-weight:700; color: ${y.profit >= 0 ? 'var(--success-color)' : 'var(--danger-color)'}">₹${y.profit.toLocaleString()}</td>
+                            <td><span class="badge bg-info" style="background:var(--info-color); color:white;">${y.rooms_booked} Rooms</span></td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) { console.error('Error loading reports:', error); }
+        }
+
+        function filterLedger(input) {
+            const filter = input.value.toUpperCase();
+            const rows = document.getElementById('ledgerTableBody').getElementsByTagName('tr');
+            for (let row of rows) {
+                row.style.display = row.innerText.toUpperCase().includes(filter) ? '' : 'none';
+            }
+        }
+
+        // --- Guests ---
+        async function loadGuests() {
+            try {
+                const response = await fetch('/api/guests');
+                const guests = await response.json();
+                const tbody = document.getElementById('guestsTableBody');
+                if (!tbody) return; // Exit if guestsTableBody is not on the current page
+                tbody.innerHTML = guests.map(guest => `
+                    <tr>
+                        <td>${guest.guest_name}</td>
+                        <td class="mobile-hide">${guest.phone}</td>
+                        <td>${guest.room_id}</td>
+                        <td class="mobile-hide">${guest.checkin_time}</td>
+                        <td class="mobile-hide">${guest.checkout_time || '-'}</td>
+                        <td><button class="btn btn-primary btn-sm" onclick="viewGuest(${guest.id})">View</button></td>
+                    </tr>
+                `).join('');
+            } catch (error) { console.error('Error loading guests:', error); }
+        }
+
+        async function viewGuest(guestId) {
+            try {
+                const response = await fetch(`/api/guest/${guestId}`);
+                const guest = await response.json();
+
+                // Fetch extra profile details (like email) from search_guest API
+                const profileResp = await fetch(`/api/guests/search?phone=${guest.phone}`);
+                const profile = await profileResp.json();
+                const guestEmail = profile.success ? (profile.guest.email || '') : '';
+
+                let photosHtml = guest.id_photo ? guest.id_photo.split(',').map(photo =>
+                    `<a href="/static/${photo}" target="_blank"><img src="/static/${photo}" style="height: 80px; margin-right: 10px; border-radius: 4px;"></a>`
+                ).join('') : 'No photos';
+
+                document.getElementById('guestProfileContent').innerHTML = `
+                    <div id="guestDisplayView">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
+                            <div>
+                                <p style="margin-bottom: 0.25rem; color: var(--text-secondary);">Guest Profile</p>
+                                <h2 style="color: var(--text-primary); margin: 0;">${guest.guest_name}</h2>
+                                <p style="color: var(--gold); font-size: 0.9rem; margin-top: 0.25rem;">${guestEmail}</p>
+                            </div>
+                            <button class="btn btn-outline btn-sm" onclick="toggleGuestEdit(true)">✏️ Edit Profile</button>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div><small>Room</small><div style="font-weight: 500;">${guest.room_id}</div></div>
+                            <div><small>Phone</small><div style="font-weight: 500;">${guest.phone}</div></div>
+                            <div><small>Check-in</small><div>${guest.checkin_time}</div></div>
+                            <div><small>Check-out</small><div>${guest.checkout_time || 'Active'}</div></div>
+                        </div>
+
+                        <div style="margin-top: 1rem;">
+                            <small>Total Bill</small>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--success-color);">₹${(guest.amount || 0) + (guest.extra_charges || 0)}</div>
+                        </div>
+
+                        <div style="margin-top: 1rem;">
+                            <small>ID Documents</small>
+                            <div style="margin-top: 0.5rem;">${photosHtml}</div>
+                        </div>
+                    </div>
+
+                    <div id="guestEditView" style="display: none;">
+                        <h3 style="margin-bottom: 1.5rem;">Edit Guest Profile</h3>
+                        <input type="hidden" id="editGuestOldPhone" value="${guest.phone}">
+                        <div class="form-group">
+                            <label>Full Name</label>
+                            <input type="text" id="editGuestName" class="form-control" value="${guest.guest_name}">
+                        </div>
+                        <div class="form-group">
+                            <label>Email Address</label>
+                            <input type="email" id="editGuestEmail" class="form-control" value="${guestEmail}" placeholder="guest@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone Number</label>
+                            <input type="tel" id="editGuestPhone" class="form-control" value="${guest.phone}">
+                        </div>
+                        <div style="display: flex; gap: 10px; margin-top: 1.5rem;">
+                            <button class="btn btn-success" style="flex: 1;" onclick="saveGuestEdit()">Save Changes</button>
+                            <button class="btn btn-outline" style="flex: 1;" onclick="toggleGuestEdit(false)">Cancel</button>
+                        </div>
+                    </div>
+
+                    <div style="text-align: right; margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                        <a href="/bill/${guest.id}" target="_blank" class="btn btn-primary">Print Bill</a>
+                    </div>
+                `;
+                document.getElementById('guestProfileModal').classList.add('show');
+            } catch (error) { console.error('Error:', error); }
+        }
+
+        function toggleGuestEdit(show) {
+            document.getElementById('guestDisplayView').style.display = show ? 'none' : 'block';
+            document.getElementById('guestEditView').style.display = show ? 'block' : 'none';
+        }
+
+        async function saveGuestEdit() {
+            const oldPhone = document.getElementById('editGuestOldPhone').value;
+            const data = {
+                old_phone: oldPhone,
+                name: document.getElementById('editGuestName').value,
+                email: document.getElementById('editGuestEmail').value,
+                phone: document.getElementById('editGuestPhone').value
+            };
+
+            if (!data.name || !data.phone) return showAlert('Missing Fields', 'Name and Phone are required', 'warning');
+
+            try {
+                const response = await fetch('/api/guest/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showAlert('Success', 'Guest profile updated successfully', 'success');
+                    closeModal('guestProfileModal');
+                    loadGuests();
+                } else {
+                    showAlert('Error', result.message || 'Failed to update profile', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving guest edit:', error);
+                showAlert('Error', 'An error occurred while saving', 'error');
+            }
+        }
+
+        // Guest Search Filter
+        function filterGuests() {
+            const input = document.getElementById('guestSearchInput');
+            if (!input) return;
+            const filter = input.value.toUpperCase().trim();
+            const table = document.getElementById('guestsTableBody');
+            if (!table) return;
+            const tr = table.getElementsByTagName('tr');
+
+            for (let i = 0; i < tr.length; i++) {
+                const tdName = tr[i].getElementsByTagName('td')[0];
+                const tdPhone = tr[i].getElementsByTagName('td')[1];
+                const tdRoom = tr[i].getElementsByTagName('td')[2];
+
+                if (tdName && tdPhone && tdRoom) {
+                    const txtName = (tdName.textContent || tdName.innerText).toUpperCase();
+                    const txtPhone = (tdPhone.textContent || tdPhone.innerText).toUpperCase();
+                    const txtRoom = (tdRoom.textContent || tdRoom.innerText).toUpperCase();
+
+                    if (txtName.indexOf(filter) > -1 ||
+                        txtPhone.indexOf(filter) > -1 ||
+                        txtRoom.indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                    } else {
+                        tr[i].style.display = "none";
+                    }
+                }
+            }
+        }
+
+        // --- Expenses ---
+        async function loadExpenses(params = {}) {
+            try {
+                let url = '/api/expenses';
+                const query = new URLSearchParams(params).toString();
+                if (query) url += '?' + query;
+
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Failed to fetch expenses');
+                const expenses = await response.json();
+                const container = document.getElementById('expenseList');
+                if (!container) return;
+
+                if (expenses.length === 0) {
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No expenses found for this period.</div>';
+                    return;
+                }
+
+                container.innerHTML = expenses.map(exp => `
+                    <div class="expense-item" style="border-bottom: 1px solid var(--border-color); padding: 10px 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 600; color: var(--text-primary);">${exp.name}</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                                    ${exp.date} • <span class="badge bg-secondary" style="background:#6c757d; color:white; padding: 2px 5px; border-radius:3px;">${exp.category || 'General'}</span>
+                                </div>
+                            </div>
+                            <div style="font-weight: 700; color: var(--danger-color); font-size: 1.1rem;">-₹${exp.amount.toLocaleString()}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading expenses:', error);
+            }
+        }
+
+        function updateExpenseSearchUI() {
+            const range = document.getElementById('expenseSearchRange').value;
+            const dateInput = document.getElementById('expenseSearchDate');
+            const monthYearGroup = document.getElementById('expenseMonthYearGroup');
+            const yearOnlySelect = document.getElementById('expenseSearchYearOnly');
+
+            dateInput.style.display = 'none';
+            monthYearGroup.style.display = 'none';
+            yearOnlySelect.style.display = 'none';
+
+            if (range === 'daily') dateInput.style.display = 'block';
+            else if (range === 'monthly') {
+                monthYearGroup.style.display = 'flex';
+                populateExpenseYears('expenseSearchYear');
+            }
+            else if (range === 'yearly') {
+                yearOnlySelect.style.display = 'block';
+                populateExpenseYears('expenseSearchYearOnly');
+            }
+        }
+
+        function populateExpenseYears(selectId) {
+            const select = document.getElementById(selectId);
+            if (!select || select.options.length > 0) return;
+            const currentYear = new Date().getFullYear();
+            for (let i = currentYear; i >= currentYear - 5; i--) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = i;
+                select.appendChild(opt);
+            }
+        }
+
+        function runExpenseSearch() {
+            const range = document.getElementById('expenseSearchRange').value;
+            const params = {};
+
+            if (range === 'daily') {
+                const val = document.getElementById('expenseSearchDate').value;
+                if (!val) return showAlert('Required', 'Please select a date', 'warning');
+                params.date = val;
+            } else if (range === 'monthly') {
+                params.month = document.getElementById('expenseSearchMonth').value;
+                params.year = document.getElementById('expenseSearchYear').value;
+            } else if (range === 'yearly') {
+                params.year = document.getElementById('expenseSearchYearOnly').value;
+            }
+
+            loadExpenses(params);
+        }
+
+        async function addExpense() {
+            const name = document.getElementById('expenseName').value;
+            const amount = document.getElementById('expenseAmount').value;
+            const category = document.getElementById('expenseCategory').value;
+
+            if (!name || !amount) {
+                showAlert('Missing Fields', 'Please enter both name and amount.', 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/expenses', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name,
+                        amount: parseFloat(amount),
+                        category: category
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorMsg = await response.text();
+                    throw new Error(errorMsg || `Server error ${response.status}`);
+                }
+
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('expenseName').value = '';
+                    document.getElementById('expenseAmount').value = '';
+                    showAlert('Success', 'Expense added successfully!', 'success');
+                    loadExpenses();
+                    if (window.updateFinancials) updateFinancials();
+                } else {
+                    showAlert('Error', result.message || 'Failed to add expense', 'error');
+                }
+            } catch (error) {
+                console.error('Error adding expense:', error);
+                showAlert('Error', 'Could not add expense: ' + error.message, 'error');
+            }
+        }
+
+        // --- Calendar ---
+        function loadCalendar() {
+            setTimeout(() => {
+                const calendarEl = document.getElementById('calendar');
+                if (!calendarEl) return;
+                if (calendarInstance) {
+                    calendarInstance.render();
+                    return;
+                }
+                calendarInstance = new FullCalendar.Calendar(calendarEl, {
+                    initialView: 'dayGridMonth',
+                    headerToolbar: {
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                    },
+                    events: '/api/reservations',
+                    eventClick: function (info) {
+                        showAlert('Booking Details', 'Booking: ' + info.event.title, 'info');
+                    }
+                });
+                calendarInstance.render();
+            }, 100);
+        }
+
+        // --- System Maintenance ---
+        async function restoreSystem() {
+            const fileInput = document.getElementById('backupFile');
+            const file = fileInput.files[0];
+            if (!file) { showAlert('Error', 'Please select a backup zip file first.', 'warning'); return; }
+
+            showConfirm('Restore System', 'CRITICAL WARNING: This will DELETE all current data! Proceed?', async () => {
+                const formData = new FormData();
+                formData.append('backup_zip', file);
+
+                try {
+                    const button = document.querySelector('[onclick="restoreSystem()"]');
+                    const originalText = button.textContent;
+                    button.textContent = 'Restoring...';
+                    button.disabled = true;
+
+                    const response = await fetch('/api/restore', { method: 'POST', body: formData });
+                    const result = await response.json();
+
+                    if (result.success) {
+                        showAlert('Success', result.message, 'success');
+                        setTimeout(() => window.location.reload(), 2000);
+                    } else {
+                        showAlert('Restore Failed', result.message, 'error');
+                        button.textContent = originalText;
+                        button.disabled = false;
+                    }
+                } catch (error) {
+                    console.error('Error restoring system:', error);
+                    showAlert('Error', 'An error occurred during restore.', 'error');
+                }
+            });
+        }
+
+        // --- Modals & Global events ---
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.classList.remove('show');
+        }
+
+        // Toggle Mobile Menu
+        function toggleMenu() {
+            const nav = document.querySelector('.header-nav');
+            nav.classList.toggle('show');
+        }
+
+        // Close menu when clicking outside
+        window.onclick = (e) => {
+            if (e.target.classList.contains('modal')) e.target.classList.remove('show');
+            if (!e.target.closest('.header-nav') && !e.target.closest('.mobile-menu-btn')) {
+                document.querySelector('.header-nav')?.classList.remove('show');
+            }
+        };
+
+        // --- Legacy fallback for old global variables ---
+        window.showPage = showPage;
+        window.loadRooms = loadRooms;
+        window.toggleTheme = toggleTheme;
+        window.closeModal = closeModal;
+        window.addNewRoom = addNewRoom;
+        window.confirmOverride = confirmOverride;
+        window.openBookingModal = openBookingModal;
+        window.openCheckoutModal = openCheckoutModal;
+        window.searchGuest = searchGuest;
+        window.addExpense = addExpense;
+        window.restoreSystem = restoreSystem;
+        window.updateFinancials = updateFinancials;
+        window.exportFinancials = () => exportToPDF('financial', 'Financial_Report');
+        window.exportToExcel = exportToExcel;
+        window.exportToPDF = exportToPDF;
+        window.filterGuests = filterGuests;
+
+    </script>
+    <!-- Contact Support Modal -->
+    <div id="supportModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>💬 Contact Support</h2>
+                <button class="close-btn" onclick="closeModal('supportModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Send a direct message to our support
+                    team. We usually respond within 24 hours.</p>
+                <div class="form-group">
+                    <label>Subject</label>
+                    <input type="text" id="supportSubject" class="form-control" placeholder="What is this about?">
+                </div>
+                <div class="form-group">
+                    <label>Message</label>
+                    <textarea id="supportMessage" class="form-control" style="min-height: 150px;"
+                        placeholder="Describe your issue or question..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('supportModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="submitSupportMessage()">Send Message</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="help-trigger" onclick="openStaffHelp()">i</div>
+
+    <script>
+        function openSupportModal() {
+            document.getElementById('supportModal').classList.add('show');
+        }
+
+        async function submitSupportMessage() {
+            const subject = document.getElementById('supportSubject').value;
+            const message = document.getElementById('supportMessage').value;
+
+            if (!subject || !message) {
+                return showAlert('Required', 'Please fill in both subject and message', 'error');
+            }
+
+            try {
+                const response = await fetch('/api/hotel/message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subject, message })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showAlert('Message Sent', 'Your message has been sent to our support team.', 'success');
+                    closeModal('supportModal');
+                    document.getElementById('supportSubject').value = '';
+                    document.getElementById('supportMessage').value = '';
+                } else {
+                    showAlert('Error', result.message, 'error');
+                }
+            } catch (err) {
+                showAlert('Error', 'Connection failed', 'error');
+            }
+        }
+
+        // Close tooltip when clicking outside
+        window.addEventListener('click', function (e) {
+            if (!e.target.closest('.help-btn') && !e.target.closest('.help-tooltip')) {
+                const tooltip = document.getElementById('helpTooltip');
+                if (tooltip) tooltip.style.display = 'none';
+            }
+        });
+
+        // Custom Alert System
+        function showCustomAlert(message, title = 'Notification') {
+            document.getElementById('alertMessage').innerText = message;
+            document.getElementById('alertTitle').innerText = title;
+            document.getElementById('customAlert').classList.add('show');
+        }
+
+        function closeCustomAlert() {
+            document.getElementById('customAlert').classList.remove('show');
+        }
+
+        // Override native alert
+        window.alert = function (message) {
+            };
+    </script>
+
+    </div> <!-- End main-container -->
+    </div> <!-- End sidebar-content -->
+    </div> <!-- End dashboard-shell -->
+
+    <script>
+        function openSidebar() {
+            const sidebar = document.getElementById('dashSidebar');
+            if (sidebar) sidebar.classList.add('open');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (overlay) overlay.classList.add('show');
+        }
+
+        function closeSidebar() {
+            const sidebar = document.getElementById('dashSidebar');
+            if (sidebar) sidebar.classList.remove('open');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (overlay) overlay.classList.remove('show');
+        }
+
+        // Enhancement for showPage to handle sidebar active state
+        if (typeof window.showPage === 'function') {
+            const originalShowPage = window.showPage;
+            window.showPage = function(pageId, btn) {
+                originalShowPage(pageId);
+                
+                // Update sidebar active states
+                if (btn && btn.classList.contains('sidebar-nav-item')) {
+                    document.querySelectorAll('.sidebar-nav-item').forEach(item => item.classList.remove('active'));
+                    btn.classList.add('active');
+                }
+
+                // Auto-close sidebar on mobile after navigation
+                if (window.innerWidth <= 900) {
+                    closeSidebar();
+                }
+            };
+        }
+    </script>
+
+    <!-- Guest Portal JS -->
+    <script>
+        let portalQRInstance = null;
+        let portalURL = '';
+
+        // Load QR code when Guest Portal page is opened
+        async function initGuestPortal() {
+            try {
+                const resp = await fetch('/api/portal/qr-data');
+                const data = await resp.json();
+                if (data.success) {
+                    portalURL = data.url;
+                    document.getElementById('qrUrlText').innerText = portalURL;
+
+                    // Generate QR code
+                    const container = document.getElementById('qrCodeContainer');
+                    container.innerHTML = '';
+                    portalQRInstance = new QRCode(container, {
+                        text: portalURL,
+                        width: 200,
+                        height: 200,
+                        colorDark: '#0f172a',
+                        colorLight: '#ffffff',
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                }
+            } catch (e) {
+                console.error('QR load error:', e);
+            }
+
+            loadPortalRequests();
+        }
+
+        async function loadPortalRequests() {
+            try {
+                const resp = await fetch('/api/portal/requests');
+                const requests = await resp.json();
+                const container = document.getElementById('portalRequestsList');
+
+                if (requests.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+                            <p>No requests yet / अभी कोई अनुरोध नहीं</p>
+                            <p style="font-size: 0.8rem;">Share the QR code with guests to get started!</p>
+                        </div>`;
+                    return;
+                }
+
+                let html = '';
+                requests.forEach(r => {
+                    const isPending = r.status === 'pending';
+                    const statusColor = r.status === 'accepted' ? '#10b981' : r.status === 'rejected' ? '#ef4444' : '#f59e0b';
+                    const statusLabel = r.status === 'accepted' ? '✅ Accepted' : r.status === 'rejected' ? '❌ Rejected' : '⏳ Pending';
+                    const photoHtml = r.id_photo ? `<a href="/static/${r.id_photo}" target="_blank" style="color: var(--gold); font-size: 0.8rem; text-decoration: underline;">📷 View ID</a>` : '';
+
+                    html += `
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; padding: 1rem 1.25rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                        <div style="flex-shrink: 0; width: 44px; height: 44px; background: rgba(212,175,55,0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">👤</div>
+                        <div style="flex: 1; min-width: 150px;">
+                            <strong style="font-size: 1.05rem;">${r.guest_name}</strong>
+                            <div style="color: var(--text-muted); font-size: 0.85rem;">📞 ${r.phone}</div>
+                            ${r.address ? `<div style="color: var(--text-muted); font-size: 0.8rem;">📍 ${r.address}</div>` : ''}
+                            ${(() => { try { const m = JSON.parse(r.members || '[]'); return m.length > 0 ? `<div style="color: var(--text-muted); font-size: 0.8rem;">👥 Members: ${m.join(', ')}</div>` : ''; } catch(e) { return ''; } })()}
+                            ${photoHtml}
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${r.created_at || ''}</div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            ${isPending ? `
+                                <button onclick="openAcceptModal(${r.id}, '${r.guest_name.replace(/'/g, "\\'")}', '${r.phone}')" 
+                                    style="padding: 0.5rem 1rem; background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 0.85rem;">
+                                    ✅ Accept
+                                </button>
+                                <button onclick="rejectRequest(${r.id})" 
+                                    style="padding: 0.5rem 1rem; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 0.85rem;">
+                                    ❌ Reject
+                                </button>
+                            ` : `<span style="color: ${statusColor}; font-weight: 600; font-size: 0.85rem;">${statusLabel}</span>`}
+                        </div>
+                    </div>`;
+                });
+
+                container.innerHTML = html;
+            } catch (e) {
+                console.error('Portal requests error:', e);
+            }
+        }
+
+        async function openAcceptModal(requestId, guestName, phone) {
+            document.getElementById('acceptRequestId').value = requestId;
+            document.getElementById('acceptGuestName').innerText = guestName;
+            document.getElementById('acceptGuestPhone').innerText = '📞 ' + phone;
+
+            // Set default check-in time to now
+            const now = new Date();
+            const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            document.getElementById('acceptCheckinTime').value = localISO;
+
+            // Load available rooms into cache
+            try {
+                const resp = await fetch('/api/rooms');
+                window._availableRooms = (await resp.json()).filter(r => r.status === 'available');
+            } catch (e) {
+                window._availableRooms = [];
+                console.error('Rooms load error:', e);
+            }
+
+            // Reset room rows to one default
+            document.getElementById('roomRowsContainer').innerHTML = '';
+            addRoomRow();
+
+            document.getElementById('acceptCheckinModal').classList.add('show');
+        }
+
+        function closeAcceptModal() {
+            document.getElementById('acceptCheckinModal').classList.remove('show');
+        }
+
+        function buildRoomOptions() {
+            const rooms = window._availableRooms || [];
+            let opts = '<option value="">Select Room / कमरा चुनें</option>';
+            rooms.forEach(r => {
+                opts += `<option value="${r.room_id}">🚪 Room ${r.room_id} ${r.room_type ? '(' + r.room_type + ')' : ''}</option>`;
+            });
+            return opts;
+        }
+
+        let _roomRowCount = 0;
+        function addRoomRow() {
+            _roomRowCount++;
+            const id = _roomRowCount;
+            const container = document.getElementById('roomRowsContainer');
+            const row = document.createElement('div');
+            row.id = `roomRow_${id}`;
+            row.style.cssText = 'display:grid; grid-template-columns: 1fr 1fr auto; gap: 0.75rem; align-items: center; margin-bottom: 0.75rem; background: rgba(255,255,255,0.03); padding: 0.75rem; border-radius: 10px; border: 1px solid var(--border-color);';
+            row.innerHTML = `
+                <select class="form-control room-row-select" data-row="${id}" style="padding: 0.6rem;">${buildRoomOptions()}</select>
+                <input type="number" class="form-control room-row-price" data-row="${id}" placeholder="Price ₹" style="padding: 0.6rem;">
+                ${id > 1 ? `<button type="button" onclick="removeRoomRow(${id})" style="background: rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:6px 10px; cursor:pointer; font-size:1rem; white-space:nowrap;">✕</button>` : '<span></span>'}
+            `;
+            container.appendChild(row);
+        }
+
+        function removeRoomRow(id) {
+            const row = document.getElementById(`roomRow_${id}`);
+            if (row) row.remove();
+        }
+
+        async function confirmAcceptCheckin() {
+            const requestId = document.getElementById('acceptRequestId').value;
+            const checkinTime = document.getElementById('acceptCheckinTime').value;
+            const checkoutTime = document.getElementById('acceptCheckoutTime').value;
+
+            // Collect all room rows
+            const selects = document.querySelectorAll('.room-row-select');
+            const prices = document.querySelectorAll('.room-row-price');
+            const roomEntries = [];
+            let hasError = false;
+
+            selects.forEach((sel, idx) => {
+                const roomId = sel.value;
+                const amount = prices[idx] ? prices[idx].value : '';
+                if (!roomId) {
+                    showAlert('Error', 'Please select a room for each row / सभी पंक्तियों के लिए कमरा चुनें', 'error');
+                    hasError = true;
+                    return;
+                }
+                if (!amount) {
+                    showAlert('Error', 'Please enter price for each room / सभी कमरों का किराया दर्ज करें', 'error');
+                    hasError = true;
+                    return;
+                }
+                roomEntries.push({ room_id: roomId, amount: parseFloat(amount) });
+            });
+
+            if (hasError || roomEntries.length === 0) return;
+
+            try {
+                // Check in each room sequentially
+                let allOk = true;
+                for (let i = 0; i < roomEntries.length; i++) {
+                    const resp = await fetch('/api/portal/accept', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            request_id: parseInt(requestId),
+                            room_id: roomEntries[i].room_id,
+                            amount: roomEntries[i].amount,
+                            checkin_time: checkinTime,
+                            checkout_time: checkoutTime,
+                            // only mark request as accepted on last room
+                            is_last: i === roomEntries.length - 1
+                        })
+                    });
+                    const result = await resp.json();
+                    if (!result.success) {
+                        showAlert('Error', result.message || `Failed to check in Room ${roomEntries[i].room_id}`, 'error');
+                        allOk = false;
+                        break;
+                    }
+                }
+
+                if (allOk) {
+                    closeAcceptModal();
+                    const roomList = roomEntries.map(r => 'Room ' + r.room_id).join(', ');
+                    showAlert('Success! / सफल!', `Guest checked into ${roomList} successfully!`, 'success');
+                    loadPortalRequests();
+                    if (typeof loadRooms === 'function') loadRooms();
+                }
+            } catch (e) {
+                showAlert('Error', 'Connection error / कनेक्शन त्रुटि', 'error');
+            }
+        }
+
+        async function rejectRequest(requestId) {
+            if (!confirm('Reject this request? / क्या आप इस अनुरोध को अस्वीकार करना चाहते हैं?')) return;
+
+            try {
+                const resp = await fetch('/api/portal/reject', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ request_id: requestId })
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    loadPortalRequests();
+                }
+            } catch (e) {
+                console.error('Reject error:', e);
+            }
+        }
+
+        function downloadQR() {
+            const canvas = document.querySelector('#qrCodeContainer canvas');
+            if (canvas) {
+                const link = document.createElement('a');
+                link.download = 'guest-checkin-qr.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }
+        }
+
+        function copyQRLink() {
+            if (portalURL) {
+                navigator.clipboard.writeText(portalURL).then(() => {
+                    showAlert('Copied! / कॉपी हो गया!', 'Link copied to clipboard', 'success');
+                }).catch(() => {
+                    // Fallback
+                    const ta = document.createElement('textarea');
+                    ta.value = portalURL;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    showAlert('Copied!', 'Link copied', 'success');
+                });
+            }
+        }
+
+        // Poll pending count for badge
+        async function updatePortalBadge() {
+            try {
+                const resp = await fetch('/api/portal/pending-count');
+                const data = await resp.json();
+                const badge = document.getElementById('portalBadge');
+                if (badge) {
+                    if (data.count > 0) {
+                        badge.style.display = 'inline-block';
+                        badge.innerText = data.count;
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            } catch (e) { /* silent */ }
+        }
+
+        // Hook into showPage to initialize portal when opened
+        const _origShowPageForPortal = window.showPage;
+        window.showPage = function(pageId, btn) {
+            if (typeof _origShowPageForPortal === 'function') {
+                _origShowPageForPortal(pageId, btn);
+            }
+            if (pageId === 'guest-portal') {
+                initGuestPortal();
+            }
+        };
+
+        // Start badge polling
+        updatePortalBadge();
+        setInterval(updatePortalBadge, 15000);
+    </script>
+</body>
+
+</html>

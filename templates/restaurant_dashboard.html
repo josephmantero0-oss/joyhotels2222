@@ -1,0 +1,2460 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ session.hotel_name }} - Restaurant Dashboard</title>
+    
+    <!-- PWA Mobile App Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#10b981">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+    
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registered successfully.'))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Export Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+
+    <!-- Theme Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+    <style>
+        :root {
+            --res-primary: #10b981;
+            /* Emerald Green for Restaurant */
+            --res-primary-hover: #059669;
+        }
+
+        .res-stat-card {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            transition: transform 0.2s;
+        }
+
+        .res-stat-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .res-stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--res-primary);
+        }
+
+        .tables-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .table-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .table-card.available {
+            border-color: var(--res-primary);
+        }
+
+        .table-card.occupied {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.05);
+        }
+
+        .table-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .table-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .table-status {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .available .table-status {
+            color: var(--res-primary);
+        }
+
+        .occupied .table-status {
+            color: #ef4444;
+        }
+
+        /* JoyPopup Base Styles */
+        .joy-popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(5px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            padding: 20px;
+        }
+
+        .joy-popup-box {
+            background: #1e293b;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 450px;
+            padding: 2.5rem;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: popupSlideIn 0.3s ease-out;
+        }
+
+        @keyframes popupSlideIn {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .joy-popup-icon-container {
+            width: 80px;
+            height: 80px;
+            background: #10b981;
+            /* Default to success green */
+            border-radius: 8px;
+            /* Matching the square look with slight rounding from SS */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 1.5rem;
+            color: white;
+            font-size: 2.5rem;
+        }
+
+        /* Mobile Menu Responsive Styles */
+        .header-nav.active {
+            display: flex !important;
+            flex-direction: column;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            background: #1e293b;
+            padding: 1rem 0;
+            border-bottom: 2px solid var(--res-primary);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+            z-index: 1001;
+        }
+
+        .header-nav.active .nav-btn {
+            width: 100%;
+            text-align: center;
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            margin: 0 !important;
+        }
+
+        @media (max-width: 1024px) {
+            .mobile-menu-btn {
+                display: block !important;
+            }
+
+            .header-nav {
+                display: none;
+            }
+
+            .mobile-hide {
+                display: none;
+            }
+        }
+
+        .joy-popup-icon-container.confirm {
+            background: var(--res-primary);
+        }
+
+        .joy-popup-icon-container.prompt {
+            background: #3b82f6;
+        }
+
+        /* Blue for info/input */
+
+        .joy-popup-box h3 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 0.75rem;
+        }
+
+        .joy-popup-box p {
+            color: #94a3b8;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+        }
+
+        .joy-popup-input {
+            width: 100%;
+            padding: 1rem;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .joy-popup-input:focus {
+            outline: none;
+            border-color: var(--res-primary);
+        }
+
+        .joy-popup-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .joy-btn {
+            padding: 1rem;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .joy-btn-primary {
+            background: #10b981;
+            color: #fff;
+        }
+
+        .joy-btn-primary:hover {
+            background: #059669;
+        }
+
+        .joy-btn-secondary {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+
+        .joy-btn-secondary:hover {
+            background: #e2e8f0;
+        }
+
+        /* POS Search Suggestions */
+        #searchSuggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #1e293b;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            z-index: 1000;
+            max-height: 250px;
+            overflow-y: auto;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+
+        .suggestion-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .suggestion-item:hover {
+            background: rgba(212, 175, 55, 0.1);
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .pos-btn {
+            background: var(--res-primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .pos-btn:hover {
+            background: var(--res-primary-hover);
+            transform: translateY(-2px);
+        }
+
+        .switch-badge {
+            background: var(--gold);
+            color: #0f172a;
+            padding: 4px 10px;
+            border-radius: 99px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            margin-left: 10px;
+            vertical-align: middle;
+            text-transform: uppercase;
+        }
+
+        /* Premium Toast Notifications */
+        #toastContainer {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: #1e293b;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            border-left: 5px solid var(--res-primary);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 300px;
+            animation: slideIn 0.3s ease-out forwards;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .toast.error {
+            border-left-color: #ef4444;
+        }
+
+        .toast.success {
+            border-left-color: #10b981;
+        }
+
+        .toast.info {
+            border-left-color: #3b82f6;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+        }
+
+        .toast.fade-out {
+            animation: fadeOut 0.3s ease-out forwards;
+        }
+
+        .toast-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.2);
+            width: 100%;
+            transform-origin: left;
+            animation: progress 3s linear forwards;
+        }
+
+        @keyframes progress {
+            from {
+                transform: scaleX(1);
+            }
+
+            to {
+                transform: scaleX(0);
+            }
+        }
+
+        /* Help Info Icon Styles */
+        .info-btn {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--res-primary);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            cursor: pointer;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            margin-left: 8px;
+            vertical-align: middle;
+            transition: all 0.2s;
+        }
+
+        .info-btn:hover {
+            background: var(--res-primary);
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .help-content h4 {
+            color: var(--gold);
+            margin: 1.5rem 0 0.5rem 0;
+        }
+
+        .help-content ul {
+            padding-left: 1.2rem;
+            margin-bottom: 1rem;
+        }
+
+        .help-content li {
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        /* Floating Help Trigger */
+        .help-trigger {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 3.5rem;
+            height: 3.5rem;
+            background: var(--res-primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .help-trigger:hover {
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Sidebar overlay for mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <div id="toastContainer"></div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 id="helpTitle">Feature Guide</h2>
+                <span class="close" onclick="closeModal('helpModal')">&times;</span>
+            </div>
+            <div id="helpContent" class="help-content" style="max-height: 70vh; overflow-y: auto; padding-right: 10px;">
+                <!-- Content injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Standing Sidebar -->
+    <div class="dashboard-shell">
+        <nav class="sidebar res-sidebar" id="dashSidebar">
+            <!-- Logo / Brand -->
+            <a href="/" class="sidebar-logo">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+                <span class="hotel-name">{{ session.hotel_name }} <span class="res-badge">Restaurant</span></span>
+            </a>
+
+            <!-- Navigation Items -->
+            <div class="sidebar-nav">
+                <span class="sidebar-section-label">Operations</span>
+                <button class="sidebar-nav-item active" id="nav-res-dashboard" onclick="showPage('res-dashboard', this)">
+                    <span class="nav-icon">📊</span> Overview
+                </button>
+                <button class="sidebar-nav-item" id="nav-res-billing" onclick="showPage('res-billing', this)">
+                    <span class="nav-icon">⚡</span> POS Billing
+                </button>
+                <button class="sidebar-nav-item" id="nav-res-menu" onclick="showPage('res-menu', this)">
+                    <span class="nav-icon">🍴</span> Menu Management
+                </button>
+                
+                <span class="sidebar-section-label">Finance & Stock</span>
+                <button class="sidebar-nav-item" id="nav-res-ledger" onclick="showPage('res-ledger', this)">
+                    <span class="nav-icon">📈</span> Sales Ledger
+                </button>
+                <button class="sidebar-nav-item" id="nav-res-expenses" onclick="showPage('res-expenses', this)">
+                    <span class="nav-icon">💸</span> Expenses
+                </button>
+                <button class="sidebar-nav-item" id="nav-res-inventory" onclick="showPage('res-inventory', this)">
+                    <span class="nav-icon">📦</span> Inventory
+                </button>
+
+                <span class="sidebar-section-label">System</span>
+                <button class="sidebar-nav-item" onclick="window.open('/restaurant_kds', '_blank')">
+                    <span class="nav-icon">👨‍🍳</span> Kitchen Mode
+                </button>
+                <button class="sidebar-nav-item" id="nav-res-settings" onclick="showPage('res-settings', this)">
+                    <span class="nav-icon">⚙️</span> Settings
+                </button>
+                
+                {% if session.is_hotel_active %}
+                <button class="sidebar-nav-item" onclick="window.location.href='/switch_system'"
+                    style="color: var(--gold); margin-top: 0.5rem;">
+                    <span class="nav-icon">🔄</span> Switch to Hotel
+                </button>
+                {% endif %}
+            </div>
+
+            <!-- Sidebar Footer -->
+            <div class="sidebar-footer">
+                <div class="sidebar-user">👤 {{ session.username|title }}</div>
+                <button class="logout-btn" onclick="window.location.href='/logout'" style="width: 100%;">Logout</button>
+            </div>
+        </nav>
+
+        <!-- Content Area -->
+        <div class="sidebar-content">
+            <!-- Slim top bar -->
+            <div class="slim-topbar">
+                <button class="sidebar-toggle-btn" onclick="openSidebar()">☰</button>
+                <div style="flex: 1;"></div>
+                <div class="user-info" style="border: none; background: transparent; padding: 0;">
+                    <span>👤 {{ session.username|title }}</span>
+                </div>
+            </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Overview Page -->
+        <div id="res-dashboard" class="page active">
+            <div class="stats-grid">
+                <div class="res-stat-card">
+                    <div class="res-stat-icon">💰</div>
+                    <div class="res-stat-info">
+                        <label style="font-size: 0.8rem; color: var(--text-secondary);">Today's Sales</label>
+                        <h2 id="todaySales">₹0</h2>
+                    </div>
+                </div>
+                <div class="res-stat-card">
+                    <div class="res-stat-icon">📑</div>
+                    <div class="res-stat-info">
+                        <label style="font-size: 0.8rem; color: var(--text-secondary);">Orders</label>
+                        <h2 id="todayOrders">0</h2>
+                    </div>
+                </div>
+                <div class="res-stat-card">
+                    <div class="res-stat-icon">🍽️</div>
+                    <div class="res-stat-info">
+                        <label style="font-size: 0.8rem; color: var(--text-secondary);">Dining Now</label>
+                        <h2 id="occupiedTables">0</h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-header" style="margin-top: 2rem;">
+                <div>
+                    <h1>Table Management <span class="info-btn" onclick="showHelp('tables')">i</span></h1>
+                    <p>Click a table to generate a new bill</p>
+                </div>
+                <button class="pos-btn" onclick="showPage('res-billing')">⚡ Quick POS Bill</button>
+            </div>
+
+            <div class="content-card">
+                <div class="tables-grid" id="tablesGrid">
+                    <!-- Table cards load here -->
+                    <div class="table-card available">
+                        <div class="table-number">T1</div>
+                        <div class="table-status">Available</div>
+                    </div>
+                    <div class="table-card occupied">
+                        <div class="table-number">T2</div>
+                        <div class="table-status">Dining</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- POS Billing Page -->
+        <div id="res-billing" class="page">
+            <div class="page-header">
+                <h1>POS Billing Engine <span class="info-btn" onclick="showHelp('pos')">i</span></h1>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-outline" onclick="resetPOS()">🧹 Clear</button>
+                    <button class="pos-btn" onclick="saveBill('unpaid')">💾 Save (Unpaid)</button>
+                    <button class="pos-btn" style="background: var(--res-primary);" onclick="saveBill('paid')">💳 Pay &
+                        Settle</button>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 350px; gap: 2rem;">
+                <!-- Billing Details -->
+                <div class="content-card">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
+                        <div class="form-group">
+                            <label>Select Table</label>
+                            <select id="posTableSelect" class="form-control">
+                                <option value="">Select Table</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Customer Mobile</label>
+                            <input type="tel" id="posCustomerMobile" class="form-control" placeholder="98765 43210">
+                        </div>
+                        <div class="form-group">
+                            <label>Item lookup (Type Code/Name)</label>
+                            <input type="text" id="posItemSearch" class="form-control" placeholder="Code (e.g. 101)"
+                                onkeyup="searchItems(this.value)">
+                            <div id="searchSuggestions"
+                                style="position: absolute; background: var(--bg-card); border: 1px solid var(--border-color); width: 200px; z-index: 100; max-height: 200px; overflow-y: auto; display: none;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="ledger-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Price</th>
+                                    <th style="width: 100px;">Qty</th>
+                                    <th>Total</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="posItemsBody">
+                                <!-- Items added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Summary Card -->
+                <div class="content-card" style="height: fit-content;">
+                    <h3>Order Summary <span class="info-btn" onclick="showHelp('pos_summary')">i</span></h3>
+                    <div style="margin: 2rem 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span>Subtotal</span>
+                            <span id="posSubtotal">₹0</span>
+                        </div>
+                        <div id="posGstRow"
+                            style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; color: var(--text-secondary);">
+                            <span id="posGstLabel">GST (0%)</span>
+                            <span id="posGstAmount">₹0</span>
+                        </div>
+                        <hr style="border-color: var(--border-color); margin: 1rem 0;">
+                        <div
+                            style="display: flex; justify-content: space-between; font-size: 1.5rem; font-weight: 700; color: var(--gold);">
+                            <span>Total</span>
+                            <span id="posTotal">₹0</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Menu Page -->
+        <div id="res-menu" class="page">
+            <div class="page-header">
+                <h1>Menu Management <span class="info-btn" onclick="showHelp('menu')">i</span></h1>
+            </div>
+            <div class="content-card">
+                <h3>Add New Item</h3>
+                <div style="display:flex; gap:1rem; flex-wrap: wrap; margin-bottom: 2rem;">
+                    <input id="menuItemName" class="form-control" placeholder="Item Name (e.g. Masala Dosa)"
+                        style="flex: 2;">
+                    <input id="menuItemCode" class="form-control" placeholder="Code (e.g. 101)" style="flex: 1;">
+                    <input id="menuItemPrice" type="number" class="form-control" placeholder="Price (₹)"
+                        style="flex: 1;">
+                    <button class="pos-btn" onclick="addMenuItem()">Add to Menu</button>
+                </div>
+
+                <div class="content-card table-responsive" style="padding: 0; border: none; background: transparent;">
+                    <table class="ledger-table"
+                        style="background: var(--bg-card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color);">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Item Name</th>
+                                <th>Price</th>
+                                <th style="text-align: center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="menuTableBody">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sales Ledger Page -->
+        <div id="res-ledger" class="page">
+            <div class="page-header">
+                <h1>Sales Ledger & Financial Analytics <span class="info-btn" onclick="showHelp('ledger')">i</span></h1>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <select id="ledgerRange" class="form-control" style="width: 120px;"
+                        onchange="updateSearchUI('ledger')">
+                        <option value="today">Today</option>
+                        <option value="daily">Daily</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
+                        <option value="all">All Time</option>
+                    </select>
+
+                    <input type="date" id="ledgerDate" class="form-control searchValue"
+                        style="display: none; width: 150px;">
+                    <input type="month" id="ledgerMonth" class="form-control searchValue"
+                        style="display: none; width: 150px;">
+                    <select id="ledgerYear" class="form-control searchValue" style="display: none; width: 100px;">
+                        <!-- Populate with years via JS -->
+                    </select>
+
+                    <button class="pos-btn" style="padding: 8px 15px;" onclick="runSearch('ledger')">🔍 Search</button>
+                </div>
+            </div>
+
+            <!-- Financial Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom:2rem;">
+                <div class="content-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <div style="color: white;">
+                        <p style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem;">Revenue</p>
+                        <h2 style="font-size: 2rem; margin: 0;" id="totalRevenue">₹0</h2>
+                    </div>
+                </div>
+                <div class="content-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                    <div style="color: white;">
+                        <p style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem;">Expenses</p>
+                        <h2 style="font-size: 2rem; margin: 0;" id="totalExpenses">₹0</h2>
+                    </div>
+                </div>
+                <div class="content-card" id="profitCard">
+                    <div style="color: white;">
+                        <p style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem;">Net Profit</p>
+                        <h2 style="font-size: 2rem; margin: 0;" id="netProfit">₹0</h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-card">
+                <div class="table-responsive">
+                    <table class="ledger-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Table</th>
+                                <th>Customer</th>
+                                <th>Total Amount</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resLedgerBody">
+                            <!-- Bills will load here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expenses Page -->
+        <div id="res-expenses" class="page">
+            <div class="page-header">
+                <h1>Expense Management <span class="info-btn" onclick="showHelp('expenses')">i</span></h1>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
+                <!-- Add Expense Form -->
+                <div class="content-card">
+                    <h3 style="margin-bottom: 1.5rem; color: var(--gold);">💸 Add New Expense</h3>
+                    <div class="form-group">
+                        <label>Expense Name / Description</label>
+                        <textarea id="expenseName" class="form-control" placeholder="e.g. Grocery Purchase" rows="1" style="resize: none; overflow: hidden; min-height: 44px; padding-top: 10px;" oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Amount (₹)</label>
+                        <input type="number" id="expenseAmount" class="form-control" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="expenseCategory" class="form-control">
+                            <option value="Food & Ingredients">Food & Ingredients</option>
+                            <option value="Utilities">Utilities</option>
+                            <option value="Salaries">Salaries</option>
+                            <option value="Rent">Rent</option>
+                            <option value="Maintenance">Maintenance</option>
+                            <option value="General">General</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="expenseDate" class="form-control">
+                    </div>
+                    <button class="pos-btn" style="width: 100%;" onclick="saveExpense()">Add Expense</button>
+                </div>
+
+                <!-- Expense List -->
+                <div class="content-card">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h3 style="color: var(--res-primary);">📋 Expense History</h3>
+
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <select id="expenseRange" class="form-control" style="width: 120px;"
+                                onchange="updateSearchUI('expense')">
+                                <option value="all">All Time</option>
+                                <option value="daily">Daily</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
+
+                            <input type="date" id="expenseDateSelect" class="form-control searchValue"
+                                style="display: none; width: 150px;">
+                            <input type="month" id="expenseMonthSelect" class="form-control searchValue"
+                                style="display: none; width: 150px;">
+                            <select id="expenseYearSelect" class="form-control searchValue"
+                                style="display: none; width: 100px;">
+                                <!-- Populate with years via JS -->
+                            </select>
+
+                            <button class="btn btn-outline" style="padding: 5px 10px;"
+                                onclick="runSearch('expense')">🔍</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="ledger-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                    <th>Date</th>
+                                    <th style="text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expenseBody">
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Page -->
+        <div id="res-inventory" class="page">
+            <div class="page-header">
+                <h1>Restaurant Inventory <span class="info-btn" onclick="showHelp('inventory')">i</span></h1>
+                <button class="pos-btn" onclick="openModal('addInventoryModal')">+ Add Item</button>
+            </div>
+
+            <div class="stats-grid" style="margin-bottom: 2rem;">
+                <div class="res-stat-card">
+                    <div class="res-stat-icon">📦</div>
+                    <div class="res-stat-info">
+                        <label style="font-size: 0.8rem; color: var(--text-secondary);">Total Items</label>
+                        <h2 id="totalInventoryItems">0</h2>
+                    </div>
+                </div>
+                <div class="res-stat-card" style="border-color: #ef4444;">
+                    <div class="res-stat-icon" style="color: #ef4444; background: rgba(239, 68, 68, 0.1);">⚠️</div>
+                    <div class="res-stat-info">
+                        <label style="font-size: 0.8rem; color: var(--text-secondary);">Low Stock</label>
+                        <h2 id="lowStockCount" style="color: #ef4444;">0</h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-card">
+                <div class="table-responsive">
+                    <table class="ledger-table">
+                        <thead>
+                            <tr>
+                                <th>Item Name</th>
+                                <th>Category</th>
+                                <th>Current Stock</th>
+                                <th>Unit</th>
+                                <th>Actions</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryBody">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Inventory Modal -->
+        <div id="addInventoryModal" class="modal">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2>Add Inventory Item</h2>
+                    <button class="close-btn" onclick="closeModal('addInventoryModal')">&times;</button>
+                </div>
+                <div class="form-group">
+                    <label>Item Name</label>
+                    <input type="text" id="invName" class="form-control" placeholder="e.g. Milk, Rice, Napkins">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="invCategory" class="form-control">
+                            <option value="Raw Materials">Raw Materials</option>
+                            <option value="Packaging">Packaging</option>
+                            <option value="Dairy">Dairy</option>
+                            <option value="Dry Goods">Dry Goods</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Unit</label>
+                        <input type="text" id="invUnit" class="form-control" placeholder="kg, ltr, pcs">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Current Stock</label>
+                        <input type="number" id="invStock" class="form-control" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Alert Level</label>
+                        <input type="number" id="invAlert" class="form-control" value="5">
+                    </div>
+                </div>
+                <button class="pos-btn" style="width: 100%; margin-top: 1rem;" onclick="saveInventoryItem()">Save
+                    Item</button>
+            </div>
+        </div>
+
+        <!-- Settings Page -->
+        <div id="res-settings" class="page">
+            <div class="page-header">
+                <h1>Restaurant Settings <span class="info-btn" onclick="showHelp('settings')">i</span></h1>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr; gap: 2rem; margin-bottom: 2rem;">
+                <!-- Profile Configuration -->
+                {% if role == 'owner' %}
+                <div class="content-card">
+                    <h3 style="margin-bottom: 1.5rem; color: var(--gold);">🏨 Identity & Contact</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Manage your restaurant profile and
+                        contact details.</p>
+                    <div
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                        <div class="form-group">
+                            <label
+                                style="color: var(--gold); font-size: 0.85rem; margin-bottom: 0.5rem; display: block;">Restaurant
+                                Name</label>
+                            <input type="text" id="restaurantProfileName" class="form-control" value="{{ hotel_name }}"
+                                placeholder="e.g. My Cafe">
+                        </div>
+                        <div class="form-group">
+                            <label
+                                style="color: var(--gold); font-size: 0.85rem; margin-bottom: 0.5rem; display: block;">Contact
+                                Email</label>
+                            <input type="email" id="restaurantProfileEmail" class="form-control"
+                                value="{{ hotel_email }}" placeholder="cafe@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label
+                                style="color: var(--gold); font-size: 0.85rem; margin-bottom: 0.5rem; display: block;">Contact
+                                Phone</label>
+                            <input type="tel" id="restaurantProfilePhone" class="form-control" value="{{ hotel_phone }}"
+                                placeholder="+91 9876543210">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 1rem;">
+                        <button class="pos-btn" onclick="saveRestaurantProfile()">Save Profile</button>
+                        <button class="pos-btn" style="background: #64748b;" onclick="triggerBackup(this)">🛡️ Backup
+                            Database</button>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- GST / Tax Settings Card -->
+                {% if role == 'owner' %}
+                <div class="content-card" style="margin-top: 0;">
+                    <h3 style="margin-bottom: 0.5rem; color: var(--gold);">💰 Tax &amp; Currency Settings</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">Set the GST % to automatically apply it on every bill.</p>
+                    <div style="display: flex; gap: 1.5rem; align-items: flex-end; flex-wrap: wrap;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="color: var(--gold); font-size: 0.85rem; margin-bottom: 0.5rem; display: block;">GST / Tax Rate (%)</label>
+                            <input type="number" id="resGstRate" class="form-control" step="0.5" min="0" max="100"
+                                value="{{ tax_rate }}" placeholder="e.g. 5" style="width: 140px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="color: var(--gold); font-size: 0.85rem; margin-bottom: 0.5rem; display: block;">Currency Symbol</label>
+                            <select id="resCurrencySymbol" class="form-control" style="width: 120px;">
+                                <option value="₹" {% if currency=='₹' %}selected{% endif %}>₹ (INR)</option>
+                                <option value="$" {% if currency=='$' %}selected{% endif %}>$ (USD)</option>
+                                <option value="€" {% if currency=='€' %}selected{% endif %}>€ (EUR)</option>
+                                <option value="£" {% if currency=='£' %}selected{% endif %}>£ (GBP)</option>
+                            </select>
+                        </div>
+                        <button class="pos-btn" onclick="saveResTaxSettings()" style="height: fit-content;">Save Tax Settings</button>
+                    </div>
+                    <div id="taxSaveStatus" style="margin-top: 1rem; display: none; padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600;"></div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 2rem;">
+                <!-- Table Configuration -->
+                <div class="content-card">
+                    <h3 style="margin-bottom: 1.5rem; color: var(--gold);">🛠️ Add New Table</h3>
+                    <div class="form-group">
+                        <label>Table Number / Name</label>
+                        <input type="text" id="settingTableNumber" class="form-control"
+                            placeholder="e.g. T5 or Window 1">
+                    </div>
+                    <button class="pos-btn" style="width: 100%; margin-top: 1rem;" onclick="saveSettingTable()">Add
+                        Table to Floor</button>
+                </div>
+
+                <!-- Active Tables List -->
+                <div class="content-card">
+                    <h3 style="margin-bottom: 1.5rem; color: var(--res-primary);">📋 Active Floor Plan</h3>
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="ledger-table">
+                            <thead>
+                                <tr>
+                                    <th>Table ID</th>
+                                    <th>Status</th>
+                                    <th style="text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="settingTableBody">
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bill Detail Page -->
+    <div id="res-bill-detail" class="page">
+        <div class="page-header">
+            <div>
+                <h1>Receipt #<span id="detailBillId"></span></h1>
+                <button class="btn btn-outline" onclick="showPage('res-ledger')">← Back to Ledger</button>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-outline" onclick="printBill()">🖨️ Print</button>
+                <button class="pos-btn" id="shareWhatsAppBtn">📲 Share via WhatsApp</button>
+            </div>
+        </div>
+
+        <div class="content-card" style="max-width: 600px; margin: 0 auto;">
+            <div id="billPrintArea">
+                <div
+                    style="text-align: center; margin-bottom: 1.5rem; border-bottom: 2px solid var(--gold); padding-bottom: 0.5rem;">
+                    <h2 style="color: var(--gold); margin: 0;">{{ session.hotel_name }}</h2>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 5px 0;">Restaurant Receipt</p>
+                </div>
+                <div id="billDetailContent">
+                    <!-- Loaded via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settlement Success Page -->
+    <div id="res-settlement-success" class="page">
+        <div class="content-card" style="max-width: 500px; margin: 5rem auto; text-align: center;">
+            <div style="font-size: 5rem; color: var(--res-primary); margin-bottom: 1.5rem;">✅</div>
+            <h2 style="color: var(--gold); margin-bottom: 0.5rem; font-size: 2rem;">Payment Settled!</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem; font-size: 1.1rem;">The bill has been marked as
+                paid and the table is now available.</p>
+
+            <div style="display: grid; gap: 15px; max-width: 400px; margin: 0 auto;">
+                <button class="pos-btn" style="width: 100%; padding: 1rem; font-size: 1.1rem;"
+                    onclick="printSettledBill()">🖨️ Print Receipt Now</button>
+                <button class="pos-btn" style="width: 100%; padding: 1rem; font-size: 1.1rem; background: #10b981;"
+                    onclick="shareSettledBill()">📲 Share via WhatsApp</button>
+                <button class="btn btn-outline" style="width: 100%; padding: 1rem; font-size: 1.1rem;"
+                    onclick="closeSettlementPage()">Done - Return to Tables</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals (Legacy - kept for backward compatibility) -->
+    <div id="addTableModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Add New Table</h2>
+                <button class="close-btn" onclick="closeModal('addTableModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>Table Number / Name</label>
+                <input type="text" id="newTableNumber" class="form-control" placeholder="e.g. T1 or Ground 1">
+            </div>
+            <button class="pos-btn" style="width: 100%;" onclick="saveTable()">Create Table</button>
+        </div>
+    </div>
+
+
+
+    <script>
+        // --- Global Tax & Currency settings ---
+        let TAX_RATE = parseFloat("{{ tax_rate }}") || 0;
+        let CURRENCY = "{{ currency }}" || "₹";
+
+        function updatePOSSummary(subtotal) {
+            const gst = subtotal * (TAX_RATE / 100);
+            const grandTotal = subtotal + gst;
+            const gstRow = document.getElementById('posGstRow');
+            if (gstRow) {
+                gstRow.style.display = TAX_RATE > 0 ? 'flex' : 'none';
+                const lbl = document.getElementById('posGstLabel');
+                const amt = document.getElementById('posGstAmount');
+                if (lbl) lbl.innerText = `GST (${TAX_RATE}%)`;
+                if (amt) amt.innerText = CURRENCY + gst.toFixed(2);
+            }
+            const totalEl = document.getElementById('posTotal');
+            const subEl = document.getElementById('posSubtotal');
+            if (subEl) subEl.innerText = CURRENCY + subtotal.toFixed(2);
+            if (totalEl) totalEl.innerText = CURRENCY + grandTotal.toFixed(2);
+        }
+
+        async function saveResTaxSettings() {
+            const tax = parseFloat(document.getElementById('resGstRate').value) || 0;
+            const currency = document.getElementById('resCurrencySymbol').value;
+            const statusEl = document.getElementById('taxSaveStatus');
+
+            try {
+                const resp = await fetch('/api/settings/finance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ currency, tax, google_review_url: '' })
+                });
+                const res = await resp.json();
+                if (res.success) {
+                    TAX_RATE = tax;
+                    CURRENCY = currency;
+                    statusEl.style.display = 'block';
+                    statusEl.style.background = 'rgba(16,185,129,0.15)';
+                    statusEl.style.color = '#10b981';
+                    statusEl.innerText = `✅ GST rate set to ${tax}% — bills will now include this automatically!`;
+                    setTimeout(() => statusEl.style.display = 'none', 4000);
+                } else {
+                    statusEl.style.display = 'block';
+                    statusEl.style.background = 'rgba(239,68,68,0.15)';
+                    statusEl.style.color = '#ef4444';
+                    statusEl.innerText = '❌ Error saving tax settings.';
+                }
+            } catch (e) {
+                statusEl.style.display = 'block';
+                statusEl.style.color = '#ef4444';
+                statusEl.innerText = '❌ Connection error';
+            }
+        }
+
+        function toggleMenu() {
+            const nav = document.querySelector('.header-nav');
+            if (nav) nav.classList.toggle('active');
+        }
+
+
+        const helpDocs = {
+            'tables': {
+                title: 'Table Management',
+                content: `
+                    <h4>Dining Status</h4>
+                    <ul>
+                        <li><b style="color: var(--res-primary);">Green Tables</b> are available for new guests.</li>
+                        <li><b style="color: #ef4444;">Red Tables</b> are currently occupied with an active bill.</li>
+                    </ul>
+                    <h4>Actions</h4>
+                    <ul>
+                        <li>Click any table to start a new bill or view the current order.</li>
+                        <li>Use the "Quick POS Bill" button if you don't want to assign a table.</li>
+                    </ul>
+                `
+            },
+            'pos': {
+                title: 'POS Billing Engine',
+                content: `
+                    <h4>Adding Items</h4>
+                    <ul>
+                        <li><b>Lookup</b>: Type the item name or its 3-digit code in the search box.</li>
+                        <li><b>Quantity</b>: Once added, you can adjust the quantity directly in the table.</li>
+                    </ul>
+                    <h4>Saving vs Settling</h4>
+                    <ul>
+                        <li><b>Save (Unpaid)</b>: Keeps the bill open on the table for future additions (KOT mode).</li>
+                        <li><b>Pay & Settle</b>: Marks the bill as final, triggers payment success, and clears the table.</li>
+                    </ul>
+                `
+            },
+            'pos_summary': {
+                title: 'Order Summary',
+                content: `
+                    <h4>Calculations</h4>
+                    <ul>
+                        <li><b>Subtotal</b>: Sum of all items before taxes.</li>
+                        <li><b>Tax</b>: Automatically calculated based on your "Tax Rate" in Settings.</li>
+                        <li><b>Total</b>: Final amount to be collected from the customer.</li>
+                    </ul>
+                `
+            },
+            'menu': {
+                title: 'Menu Management',
+                content: `
+                    <h4>Setting up your Menu</h4>
+                    <ul>
+                        <li><b>Item Code</b>: Assign a unique number (e.g., 101) to items for lightning-fast lookup in POS.</li>
+                        <li><b>Price</b>: This is the default price that will appear on bills.</li>
+                    </ul>
+                    <h4>Removal</h4>
+                    <ul>
+                        <li>Use the "Delete" icon to remove items you no longer serve.</li>
+                    </ul>
+                `
+            },
+            'ledger': {
+                title: 'Sales Ledger & Analytics',
+                content: `
+                    <h4>Financial Tracking</h4>
+                    <ul>
+                        <li><b>Revenue</b>: Total money collected from all settled bills.</li>
+                        <li><b>Net Profit</b>: Revenue minus all your registered Expenses.</li>
+                    </ul>
+                    <h4>Search</h4>
+                    <ul>
+                        <li>Filter by specific dates, months, or the entire year to audit your performance.</li>
+                    </ul>
+                `
+            },
+            'expenses': {
+                title: 'Expense Management',
+                content: `
+                    <h4>Track your Spend</h4>
+                    <ul>
+                        <li><b>Categories</b>: Group expenses like 'Groceries', 'Salaries', or 'Utilities' for better auditing.</li>
+                        <li><b>History</b>: View all past spends and delete accidental entries using the red icon.</li>
+                    </ul>
+                `
+            },
+            'inventory': {
+                title: 'Inventory & Stock Management',
+                content: `
+                    <h4>Smart Tracking</h4>
+                    <ul>
+                        <li><b>Auto-Deduction</b>: If your Inventory item name matches your Menu item name, stock will automatically decrease when a bill is settled!</li>
+                        <li><b>Alert Level</b>: Set a threshold (e.g., 5 pcs). The item will turn red when stock falls below this.</li>
+                    </ul>
+                    <h4>Stock Levels</h4>
+                    <ul>
+                        <li>Use the (+/-) buttons to manually adjust stock when you purchase new supplies.</li>
+                    </ul>
+                `
+            },
+            'settings': {
+                title: 'Restaurant Settings',
+                content: `
+                    <h4>Configuration</h4>
+                    <ul>
+                        <li><b>Hotel Profile</b>: Update your restaurant's name and contact info shown on bills.</li>
+                        <li><b>Kitchen Mode (KDS)</b>: Open this in a separate tablet/screen for your chef to view live orders.</li>
+                        <li><b>Backup</b>: Sends a full copy of your database to your registered email for safety.</li>
+                    </ul>
+                `
+            },
+            'support': {
+                title: 'Contact & Support',
+                content: `
+                    <h4>Support Team</h4>
+                    <p>If you face any issues or need assistance, please contact the support team directly:</p>
+                    <ul>
+                        <li>📞 <b>Phone</b>: 8956364864</li>
+                        <li>📧 <b>Email</b>: joyhotels500@gmail.com</li>
+                    </ul>
+                    <h4>System Help</h4>
+                    <p>For technical issues, you can also leave a message for the Super Admin through the system dashboard.</p>
+                `
+            }
+        };
+
+        const JoyPopup = {
+            get elements() {
+                return {
+                    overlay: document.getElementById('joyPopupOverlay'),
+                    iconBox: document.getElementById('joyPopupIconBox'),
+                    icon: document.getElementById('joyPopupIcon'),
+                    title: document.getElementById('joyPopupTitle'),
+                    msg: document.getElementById('joyPopupMessage'),
+                    inputContainer: document.getElementById('joyPopupInputContainer'),
+                    input: document.getElementById('joyPopupInput'),
+                    btnPrimary: document.getElementById('joyPopupPrimaryBtn'),
+                    btnSecondary: document.getElementById('joyPopupSecondaryBtn')
+                };
+            },
+
+            show(options) {
+                const el = this.elements;
+                if (!el.overlay) return console.error('JoyPopup: Overlay not found');
+
+                return new Promise((resolve) => {
+                    el.title.innerText = options.title || 'Notification';
+                    el.msg.innerText = options.message || '';
+                    el.icon.innerText = options.icon || '✅';
+                    el.iconBox.className = 'joy-popup-icon-container ' + (options.type || '');
+
+                    el.btnPrimary.innerText = options.primaryText || 'OK';
+                    el.btnSecondary.innerText = options.secondaryText || 'Cancel';
+                    el.btnSecondary.style.display = options.showCancel ? 'flex' : 'none';
+                    el.inputContainer.style.display = options.showInput ? 'block' : 'none';
+                    if (options.showInput) {
+                        el.input.value = options.defaultInput || '';
+                        el.input.placeholder = options.placeholder || '';
+                    }
+
+                    el.overlay.style.display = 'flex';
+
+                    el.btnPrimary.onclick = () => {
+                        const val = el.input.value;
+                        this.hide();
+                        resolve(options.showInput ? val : true);
+                    };
+
+                    el.btnSecondary.onclick = () => {
+                        this.hide();
+                        resolve(options.showInput ? null : false);
+                    };
+                });
+            },
+
+            hide() {
+                const overlay = document.getElementById('joyPopupOverlay');
+                if (overlay) overlay.style.display = 'none';
+            },
+
+            alert(message, title = 'Notification') {
+                return this.show({ message, title, icon: '✅', type: 'alert' });
+            },
+
+            confirm(message, title = 'Confirm Action') {
+                return this.show({ message, title, icon: '⚠️', type: 'confirm', showCancel: true, primaryText: 'Yes, Proceed', secondaryText: 'Wait, Cancel' });
+            },
+
+            prompt(message, placeholder = '', title = 'Input Required') {
+                return this.show({ message, title, icon: '❓', type: 'prompt', showInput: true, showCancel: true, primaryText: 'Submit', secondaryText: 'Cancel', placeholder });
+            }
+        };
+
+        function showHelp(section) {
+            const doc = helpDocs[section];
+            if (!doc) return;
+            document.getElementById('helpTitle').innerText = doc.title;
+            document.getElementById('helpContent').innerHTML = doc.content;
+            openModal('helpModal');
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            let icon = 'ℹ️';
+            if (type === 'success') icon = '✅';
+            if (type === 'error') icon = '❌';
+
+            toast.innerHTML = `
+                <span>${icon}</span>
+                <span>${message}</span>
+                <div class="toast-progress"></div>
+            `;
+
+            container.appendChild(toast);
+
+            // Auto remove
+            setTimeout(() => {
+                toast.classList.add('fade-out');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+            document.getElementById(pageId).classList.add('active');
+            // Find button that has onclick with this pageId
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(pageId)) {
+                    btn.classList.add('active');
+                }
+            });
+
+            if (pageId === 'res-dashboard') loadTables();
+            if (pageId === 'res-menu') loadMenu();
+            if (pageId === 'res-ledger') loadLedger();
+            if (pageId === 'res-billing') loadPOSData();
+            if (pageId === 'res-expenses') loadExpenses();
+            if (pageId === 'res-inventory') loadInventory();
+            if (pageId === 'res-settings') loadSettingTableList();
+        }
+
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        async function triggerBackup(btn) {
+            const confirmed = await JoyPopup.confirm('Download and email a complete database backup? (This may take a few seconds)');
+            if (!confirmed) return;
+
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = 'Backing up...';
+
+            try {
+                const response = await fetch('/api/settings/backup', { method: 'POST' });
+                const res = await response.json();
+                if (res.success) {
+                    showToast('✅ Backup successfully sent to your email!', 'success');
+                } else {
+                    showToast('❌ Error: ' + res.message, 'error');
+                }
+            } catch (e) {
+                showToast('❌ Connection error. Check server logs.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        }
+
+        // --- KDS Ready notifications polling ---
+        let notifiedKDSItems = new Set();
+        async function checkKDSNotifications() {
+            try {
+                const resp = await fetch('/api/restaurant/kds/ready_notifications');
+                const items = await resp.json();
+
+                for (const it of items) {
+                    if (!notifiedKDSItems.has(it.id)) {
+                        notifiedKDSItems.add(it.id);
+                        showKDSReadyAlert(it);
+                    }
+                }
+            } catch (e) { console.error('KDS Notification Error:', e); }
+        }
+
+        function showKDSReadyAlert(it) {
+            // Using JoyPopup.confirm since it provides two buttons
+            JoyPopup.show({
+                title: 'Dish Ready! 🍳',
+                message: `Table ${it.table_id || 'N/A'}: ${it.item_name} (x${it.quantity}) is ready for delivery.`,
+                icon: '🚀',
+                type: 'alert',
+                primaryText: 'Mark Delivered',
+                secondaryText: 'Later',
+                showCancel: true
+            }).then(async (delivered) => {
+                if (delivered) {
+                    await fetch(`/api/restaurant/kds/serve/${it.id}`, { method: 'POST' });
+                }
+            });
+        }
+
+        // Start polling only if we are in the restaurant context
+        if (window.location.pathname.includes('restaurant_dashboard')) {
+            // Initial check for KDS notifications
+            setTimeout(checkKDSNotifications, 1000);
+            setInterval(checkKDSNotifications, 10000);
+        }
+
+        // --- Inventory Logic ---
+        async function loadInventory() {
+            try {
+                const response = await fetch('/api/restaurant/inventory');
+                const items = await response.json();
+                const tbody = document.getElementById('inventoryBody');
+                if (!tbody) return;
+
+                let lowStock = 0;
+                tbody.innerHTML = items.map(it => {
+                    const isLow = it.stock <= it.alert_level;
+                    if (isLow) lowStock++;
+                    return `
+                        <tr>
+                            <td><strong>${it.name}</strong></td>
+                            <td><span class="category-badge">${it.category}</span></td>
+                            <td style="color: ${isLow ? '#ef4444' : 'inherit'}; font-weight: ${isLow ? 'bold' : 'normal'};">
+                                ${it.stock} ${it.unit}
+                                ${isLow ? ' ⚠️' : ''}
+                            </td>
+                            <td>${it.unit}</td>
+                            <td>
+                                <button class="btn btn-outline" style="padding: 2px 8px;" onclick="adjustStock(${it.id}, 1)">+</button>
+                                <button class="btn btn-outline" style="padding: 2px 8px;" onclick="adjustStock(${it.id}, -1)">-</button>
+                            </td>
+                            <td style="text-align: right;">
+                                <button onclick="deleteInventoryItem(${it.id})" style="background: none; border: none; color: #ef4444; cursor: pointer;">🗑️</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                document.getElementById('totalInventoryItems').innerText = items.length;
+                document.getElementById('lowStockCount').innerText = lowStock;
+
+            } catch (e) { console.error('Inventory Error:', e); }
+        }
+
+        async function saveInventoryItem() {
+            const data = {
+                name: document.getElementById('invName').value,
+                category: document.getElementById('invCategory').value,
+                unit: document.getElementById('invUnit').value,
+                stock: parseFloat(document.getElementById('invStock').value) || 0,
+                alert_level: parseFloat(document.getElementById('invAlert').value) || 5
+            };
+
+            if (!data.name) return showToast('Item name is required', 'error');
+
+            const response = await fetch('/api/restaurant/inventory/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const res = await response.json();
+            if (res.success) {
+                closeModal('addInventoryModal');
+                loadInventory();
+                // Clear form
+                document.getElementById('invName').value = '';
+                document.getElementById('invStock').value = '0';
+            }
+        }
+
+        async function adjustStock(id, change) {
+            await fetch(`/api/restaurant/inventory/update/${id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ change })
+            });
+            loadInventory();
+        }
+
+        async function deleteInventoryItem(id) {
+            const confirmed = await JoyPopup.confirm('Are you sure you want to delete this inventory item?');
+            if (!confirmed) return;
+            await fetch(`/api/restaurant/inventory/delete/${id}`, { method: 'DELETE' });
+            loadInventory();
+        }
+
+        // Table Management
+        async function loadTables() {
+            const resp = await fetch('/api/restaurant/tables');
+            const tables = await resp.json();
+            const grid = document.getElementById('tablesGrid');
+            grid.innerHTML = '';
+
+            tables.forEach(t => {
+                const card = document.createElement('div');
+                card.className = `table-card ${t.status}`;
+                card.innerHTML = `
+                    <div class="table-number">${t.number}</div>
+                    <div class="table-status">${t.status === 'available' ? 'Available' : 'Dining'}</div>
+                `;
+                card.onclick = () => { startBilling(t); };
+                grid.appendChild(card);
+            });
+
+            // Update Stats
+            const statsResp = await fetch('/api/restaurant/stats');
+            const stats = await statsResp.json();
+            document.getElementById('todaySales').innerText = '₹' + stats.sales;
+            document.getElementById('todayOrders').innerText = stats.orders;
+            document.getElementById('occupiedTables').innerText = stats.occupied;
+        }
+
+        async function loadSettingTableList() {
+            const resp = await fetch('/api/restaurant/tables');
+            const tables = await resp.json();
+            const body = document.getElementById('settingTableBody');
+            body.innerHTML = '';
+
+            tables.forEach(t => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${t.number}</strong></td>
+                    <td><span class="status-pill ${t.status === 'available' ? 'status-active' : 'status-suspended'}">${t.status.toUpperCase()}</span></td>
+                    <td style="text-align:center;">
+                        <button class="btn btn-sm btn-outline" style="color:#ef4444; border-color:#ef4444;" onclick="deleteTable(${t.id}, event, true)">Remove</button>
+                    </td>
+                `;
+                body.appendChild(tr);
+            });
+        }
+
+        async function saveSettingTable() {
+            const num = document.getElementById('settingTableNumber').value;
+            if (!num) return showToast('❌ Enter table number', 'error');
+
+            const resp = await fetch('/api/restaurant/tables/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ number: num })
+            });
+            const res = await resp.json();
+            if (res.success) {
+                showToast('✅ Table added successfully', 'success');
+                document.getElementById('settingTableNumber').value = '';
+                loadSettingTableList();
+            }
+        }
+
+        async function saveTable() {
+            const num = document.getElementById('newTableNumber').value;
+            if (!num) return showToast('❌ Enter table number', 'error');
+
+            const resp = await fetch('/api/restaurant/tables/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ number: num })
+            });
+            const res = await resp.json();
+            if (res.success) {
+                closeModal('addTableModal');
+                loadTables();
+            }
+        }
+
+        async function deleteTable(id, e, fromSettings = false) {
+            if (e) e.stopPropagation();
+            const confirmed = await JoyPopup.confirm('Permanently delete this table?');
+            if (!confirmed) return;
+            const resp = await fetch(`/api/restaurant/tables/delete/${id}`, { method: 'DELETE' });
+            if ((await resp.json()).success) {
+                if (fromSettings) loadSettingTableList();
+                else loadTables();
+            }
+        }
+
+        // Menu Management
+        async function loadMenu() {
+            const resp = await fetch('/api/restaurant/menu');
+            const items = await resp.json();
+            const body = document.getElementById('menuTableBody');
+            body.innerHTML = '';
+
+            items.forEach(it => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight:700; color:var(--res-primary);">${it.code}</td>
+                    <td>${it.name}</td>
+                    <td>₹${it.price}</td>
+                    <td style="text-align:center;"><button class="btn btn-sm btn-danger" onclick="deleteMenuItem(${it.id})">Delete</button></td>
+                `;
+                body.appendChild(tr);
+            });
+        }
+
+        async function addMenuItem() {
+            const name = document.getElementById('menuItemName').value;
+            const code = document.getElementById('menuItemCode').value;
+            const price = document.getElementById('menuItemPrice').value;
+
+            if (!name || !code || !price) return showToast('All fields required', 'error');
+
+            const resp = await fetch('/api/restaurant/menu/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, code, price })
+            });
+            const res = await resp.json();
+            if (res.success) {
+                document.getElementById('menuItemName').value = '';
+                document.getElementById('menuItemCode').value = '';
+                document.getElementById('menuItemPrice').value = '';
+                loadMenu();
+            } else {
+                showToast(res.message, 'error');
+            }
+        }
+
+        async function deleteMenuItem(id) {
+            const confirmed = await JoyPopup.confirm('Delete this item from the menu?');
+            if (!confirmed) return;
+            const resp = await fetch(`/api/restaurant/menu/delete/${id}`, { method: 'DELETE' });
+            if ((await resp.json()).success) loadMenu();
+        }
+
+        // Ledger Management
+        async function loadLedger(filters = {}) {
+            let url = '/api/restaurant/bills?';
+            if (filters.date) url += `date=${filters.date}&`;
+            if (filters.month) url += `month=${filters.month}&`;
+            if (filters.year) url += `year=${filters.year}&`;
+
+            const resp = await fetch(url);
+            const bills = await resp.json();
+            const body = document.getElementById('resLedgerBody');
+            body.innerHTML = '';
+
+            bills.forEach(b => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${b.date}</td>
+                    <td><strong>${b.table}</strong></td>
+                    <td>${b.mobile || 'Walk-in'}</td>
+                    <td style="font-weight:700;">₹${b.total}</td>
+                    <td><span class="badge ${b.status === 'paid' ? 'bg-income' : 'bg-expense'}">${b.status.toUpperCase()}</span></td>
+                    <td><button class="btn btn-sm btn-outline" onclick="viewBillDetail(${b.id})">👁️ View</button></td>
+                `;
+                body.appendChild(tr);
+            });
+        }
+
+        async function viewBillDetail(id) {
+            const resp = await fetch(`/api/restaurant/bill/${id}`);
+            const data = await resp.json();
+
+            // Fetch global guest profile for this mobile
+            let guestProfile = { name: 'Walk-in', email: '' };
+            if (data.mobile) {
+                const profileResp = await fetch(`/api/guests/search?phone=${data.mobile}`);
+                const profileData = await profileResp.json();
+                if (profileData && profileData.success) {
+                    guestProfile = profileData.guest;
+                }
+            }
+
+            document.getElementById('detailBillId').innerText = data.id;
+            const content = document.getElementById('billDetailContent');
+
+            let itemsHtml = '';
+            data.items.forEach(it => {
+                itemsHtml += `
+                    <div style="display:flex; justify-content:space-between; padding: 5px 0; border-bottom: 1px solid var(--border-color);">
+                        <span>${it.name} x ${it.quantity}</span>
+                        <span>₹${it.price * it.quantity}</span>
+                    </div>
+                `;
+            });
+
+            content.innerHTML = `
+                <div id="customerDisplayView" style="margin-bottom: 1rem; border-bottom: 2px dashed var(--border-color); padding-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <p style="margin-bottom: 5px;"><strong style="color:var(--gold);">Customer:</strong> ${guestProfile.name}</p>
+                            <p style="margin-bottom: 5px;"><strong>Mobile:</strong> ${data.mobile || 'None'}</p>
+                            ${guestProfile.email ? `<p style="margin-bottom: 5px;"><strong>Email:</strong> ${guestProfile.email}</p>` : ''}
+                            <p><strong>Date:</strong> ${data.date}</p>
+                        </div>
+                        ${data.mobile ? `<button class="btn btn-sm btn-outline" onclick="toggleCustomerEdit(true)">✏️ Edit</button>` : ''}
+                    </div>
+                    <p style="margin-top: 5px;"><strong>Table:</strong> ${data.table_id}</p>
+                </div>
+
+                <div id="customerEditView" style="display: none; margin-bottom: 1rem; border-bottom: 2px dashed var(--border-color); padding-bottom: 1rem;">
+                    <h4 style="color:var(--gold); margin-bottom: 1rem;">Edit Customer Info</h4>
+                    <input type="hidden" id="editOldMobile" value="${data.mobile}">
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label style="font-size: 0.8rem;">Full Name</label>
+                        <input type="text" id="editCustName" class="form-control" value="${guestProfile.name}">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label style="font-size: 0.8rem;">Email Address</label>
+                        <input type="email" id="editCustEmail" class="form-control" value="${guestProfile.email}" placeholder="email@example.com">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="font-size: 0.8rem;">Mobile Number</label>
+                        <input type="tel" id="editCustMobile" class="form-control" value="${data.mobile}">
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-sm btn-success" style="flex: 1;" onclick="saveCustomerEdit()">Save</button>
+                        <button class="btn btn-sm btn-outline" style="flex: 1;" onclick="toggleCustomerEdit(false)">Cancel</button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 1rem;">
+                    ${itemsHtml}
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size: 1.25rem; font-weight:700; color:var(--gold);">
+                    <span>Total</span>
+                    <span>₹${data.total}</span>
+                </div>
+            `;
+
+            // Prepare WhatsApp Share
+            const shareBtn = document.getElementById('shareWhatsAppBtn');
+            shareBtn.onclick = () => shareBill(data);
+
+            // Navigate to dedicated bill detail page
+            showPage('res-bill-detail');
+        }
+
+        function toggleCustomerEdit(show) {
+            document.getElementById('customerDisplayView').style.display = show ? 'none' : 'block';
+            document.getElementById('customerEditView').style.display = show ? 'block' : 'none';
+        }
+
+        async function saveCustomerEdit() {
+            const oldPhone = document.getElementById('editOldMobile').value;
+            const data = {
+                old_phone: oldPhone,
+                name: document.getElementById('editCustName').value,
+                email: document.getElementById('editCustEmail').value,
+                phone: document.getElementById('editCustMobile').value
+            };
+
+            if (!data.name || !data.phone) return showToast('Name and Mobile are required', 'error');
+
+            try {
+                const response = await fetch('/api/guest/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showToast('✅ Customer info updated successfully', 'success');
+                    const billId = document.getElementById('detailBillId').innerText;
+                    viewBillDetail(billId); // Refresh view
+                    loadLedger(); // Refresh background list
+                } else {
+                    showToast('❌ ' + (result.message || 'Update failed'), 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('❌ Update failed', 'error');
+            }
+        }
+
+        function printBill() {
+            const area = document.getElementById('billPrintArea');
+            const originalContent = document.body.innerHTML;
+            document.body.innerHTML = `<div style="padding:40px; color:black; background:white;">${area.innerHTML}</div>`;
+            window.print();
+            window.location.reload(); // Quickest way to restore dashboard state
+        }
+
+        async function shareBill(data) {
+            const mob = String(data.mobile || '').trim();
+            if (!mob || mob === 'Walk-in' || mob === 'None' || mob.toLowerCase() === 'walk-in' || mob.toLowerCase() === 'none') {
+                const mobile = await JoyPopup.prompt("Enter customer mobile number for WhatsApp sharing:", "Mobile Number (e.g. 9876543210)");
+                if (mobile) {
+                    data.mobile = mobile;
+                } else {
+                    return;
+                }
+            }
+
+            let message = `*Receipt from {{ session.hotel_name }}*\n`;
+            message += `Order #${data.id} | Table: ${data.table_id}\n`;
+            message += `--------------------------\n`;
+            data.items.forEach(it => {
+                message += `${it.name} x ${it.quantity}: ₹${it.price * it.quantity}\n`;
+            });
+            message += `--------------------------\n`;
+            message += `*Total: ₹${data.total}*\n`;
+            message += `\nThank you for dining with us!`;
+
+            const encoded = encodeURIComponent(message);
+            window.open(`https://wa.me/91${data.mobile}?text=${encoded}`, '_blank');
+        }
+
+        let lastSettledBillId = null;
+
+        function printSettledBill() {
+            if (lastSettledBillId) {
+                window.open(`/restaurant/bill/${lastSettledBillId}`, '_blank');
+            }
+        }
+
+        function shareSettledBill() {
+            if (lastSettledBillId) {
+                // Fetch bill data and trigger WhatsApp share
+                fetch(`/api/restaurant/bill/${lastSettledBillId}`)
+                    .then(r => r.json())
+                    .then(data => shareBill(data));
+            }
+        }
+
+        function closeSettlementPage() {
+            lastSettledBillId = null;
+            showPage('res-dashboard');
+        }
+
+        function startBilling(table) {
+            // Switch to POS and handle active bill loading
+            showPage('res-billing');
+
+            // Pre-select the table (no dropdown selection needed)
+            document.getElementById('posTableSelect').value = table.id;
+
+            // Auto-focus item search for keyboard-centric use
+            setTimeout(() => document.getElementById('posItemSearch').focus(), 100);
+
+            // Check if table is occupied (has an active bill)
+            if (table.status === 'occupied') {
+                loadActiveBill(table.id);
+            } else {
+                // Fresh bill for available table
+                currentBillId = null;
+                currentBillItems = [];
+                document.getElementById('posCustomerMobile').value = '';
+                renderPOSItems();
+            }
+        }
+
+        async function loadActiveBill(tableId) {
+            const resp = await fetch(`/api/restaurant/table/${tableId}/active_bill`);
+            const data = await resp.json();
+
+            if (data.has_bill) {
+                // Load existing bill
+                currentBillId = data.bill_id;
+                currentBillItems = data.items.map(it => ({
+                    id: Math.random(), // temporary UI id
+                    name: it.name,
+                    quantity: it.quantity,
+                    price: it.price
+                }));
+
+                // Pre-fill customer mobile if available
+                if (data.mobile) {
+                    document.getElementById('posCustomerMobile').value = data.mobile;
+                }
+
+                renderPOSItems();
+            } else {
+                currentBillId = null;
+                currentBillItems = [];
+                renderPOSItems();
+            }
+        }
+
+        // --- POS Logic ---
+        let currentBillItems = [];
+        let currentBillId = null; // Track if editing an existing bill
+        let allMenuItems = [];
+
+        async function loadPOSData() {
+            // Load Tables for dropdown
+            const tResp = await fetch('/api/restaurant/tables');
+            const tables = await tResp.json();
+            const select = document.getElementById('posTableSelect');
+            select.innerHTML = '<option value="">Select Table</option>';
+            tables.forEach(t => {
+                select.innerHTML += `<option value="${t.id}">${t.number} (${t.status})</option>`;
+            });
+
+            // Load Menu for search
+            const mResp = await fetch('/api/restaurant/menu');
+            allMenuItems = await mResp.json();
+
+            // Keyboard support for Quick ADD logic
+            document.getElementById('posItemSearch').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    const query = e.target.value.trim().toLowerCase();
+                    if (!query) return;
+
+                    // 1. Look for exact code match
+                    const exactCode = allMenuItems.find(it => it.code.toLowerCase() === query);
+                    if (exactCode) {
+                        addItemToPOS(exactCode);
+                        return;
+                    }
+
+                    // 2. Fallback: If only one item is currently filtered in suggestions, add it
+                    const filtered = allMenuItems.filter(it =>
+                        it.code.toLowerCase().includes(query) ||
+                        it.name.toLowerCase().includes(query)
+                    );
+                    if (filtered.length === 1) {
+                        addItemToPOS(filtered[0]);
+                    }
+                }
+            });
+        }
+
+        function searchItems(query) {
+            const suggestions = document.getElementById('searchSuggestions');
+            if (!query) {
+                suggestions.style.display = 'none';
+                return;
+            }
+
+            const filtered = allMenuItems.filter(it =>
+                it.code.toLowerCase().includes(query.toLowerCase()) ||
+                it.name.toLowerCase().includes(query.toLowerCase())
+            );
+
+            if (filtered.length > 0) {
+                suggestions.innerHTML = '';
+                filtered.forEach(it => {
+                    const div = document.createElement('div');
+                    div.className = 'suggestion-item';
+                    div.innerHTML = `<span><strong>${it.code}</strong> - ${it.name}</span> <span>₹${it.price}</span>`;
+                    div.onclick = () => addItemToPOS(it);
+                    suggestions.appendChild(div);
+                });
+                suggestions.style.display = 'block';
+            } else {
+                suggestions.style.display = 'none';
+            }
+        }
+
+        function addItemToPOS(item) {
+            const existing = currentBillItems.find(it => it.name === item.name);
+            if (existing) {
+                existing.quantity++;
+            } else {
+                currentBillItems.push({ ...item, quantity: 1 });
+            }
+
+            document.getElementById('posItemSearch').value = '';
+            document.getElementById('searchSuggestions').style.display = 'none';
+            renderPOSItems();
+        }
+
+        function renderPOSItems() {
+            const body = document.getElementById('posItemsBody');
+            body.innerHTML = '';
+            let subtotal = 0;
+
+            currentBillItems.forEach((it, idx) => {
+                const total = it.price * it.quantity;
+                subtotal += total;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${it.name}</td>
+                    <td>₹${it.price}</td>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:5px;">
+                            <button onclick="updateQty(${idx}, -1)" style="padding:0 5px; cursor:pointer;">-</button>
+                            <span>${it.quantity}</span>
+                            <button onclick="updateQty(${idx}, 1)" style="padding:0 5px; cursor:pointer;">+</button>
+                        </div>
+                    </td>
+                    <td>₹${total}</td>
+                    <td><button onclick="removeFromPOS(${idx})" style="background:none; border:none; cursor:pointer;">❌</button></td>
+                `;
+                body.appendChild(tr);
+            });
+
+            document.getElementById('posSubtotal').innerText = '₹' + subtotal;
+            document.getElementById('posTotal').innerText = '₹' + subtotal;
+        }
+
+        function updateQty(idx, delta) {
+            currentBillItems[idx].quantity += delta;
+            if (currentBillItems[idx].quantity <= 0) currentBillItems.splice(idx, 1);
+            renderPOSItems();
+        }
+
+        function removeFromPOS(idx) {
+            currentBillItems.splice(idx, 1);
+            renderPOSItems();
+        }
+
+        function resetPOS() {
+            currentBillItems = [];
+            currentBillId = null;
+            document.getElementById('posCustomerMobile').value = '';
+            document.getElementById('posTableSelect').value = '';
+            renderPOSItems();
+        }
+
+        async function saveBill(status) {
+            const tableId = document.getElementById('posTableSelect').value;
+            if (!tableId || currentBillItems.length === 0) {
+                return showToast('Please select a table and add items.', 'error');
+            }
+
+            const total = currentBillItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+
+            if (currentBillId) {
+                // Editing existing bill
+                if (status === 'paid') {
+                    // Settle the bill
+                    const settleResp = await fetch(`/api/restaurant/bill/${currentBillId}/settle`, {
+                        method: 'POST'
+                    });
+                    const settleRes = await settleResp.json();
+
+                    if (settleRes.success) {
+                        // Pre-load bill for settlement page
+                        lastSettledBillId = currentBillId;
+                        await viewBillDetail(currentBillId);
+                        showPage('res-settlement-success');
+                        resetPOS();
+                    } else {
+                        showToast('❌ Settlement failed: ' + settleRes.message, 'error');
+                    }
+                } else {
+                    // Just update the bill with new items
+                    const updateResp = await fetch(`/api/restaurant/bill/${currentBillId}/update`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            items: currentBillItems,
+                            total: total
+                        })
+                    });
+                    const updateRes = await updateResp.json();
+
+                    if (updateRes.success) {
+                        showToast('✅ Items added to bill!', 'success');
+                        resetPOS();
+                        showPage('res-dashboard');
+                    } else {
+                        showToast('❌ Update failed: ' + updateRes.message, 'error');
+                    }
+                }
+            } else {
+                // Creating a new bill
+                const data = {
+                    table_id: tableId,
+                    customer_mobile: document.getElementById('posCustomerMobile').value,
+                    items: currentBillItems,
+                    total: total,
+                    payment_status: status
+                };
+
+                const resp = await fetch('/api/restaurant/bill/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const res = await resp.json();
+                if (res.success) {
+                    if (status === 'paid') {
+                        // Pre-load bill for settlement page
+                        lastSettledBillId = res.bill_id;
+                        await viewBillDetail(res.bill_id);
+                        showPage('res-settlement-success');
+                    } else {
+                        showToast('✅ Bill saved to table.', 'success');
+                        resetPOS();
+                        showPage('res-dashboard');
+                    }
+                } else {
+                    showToast('❌ Error: ' + res.message, 'error');
+                }
+            }
+        }
+
+        // Expense Management & Financial Analytics
+        let currentPeriod = 'today';
+
+        async function saveExpense() {
+            const name = document.getElementById('expenseName').value;
+            const amount = document.getElementById('expenseAmount').value;
+            const category = document.getElementById('expenseCategory').value;
+            const date = document.getElementById('expenseDate').value;
+
+            if (!name || !amount) {
+                return showToast('❌ Please enter expense name and amount', 'error');
+            }
+
+            const resp = await fetch('/api/restaurant/expenses/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, amount, category, date })
+            });
+
+            const res = await resp.json();
+            if (res.success) {
+                document.getElementById('expenseName').value = '';
+                document.getElementById('expenseAmount').value = '';
+                document.getElementById('expenseDate').valueAsDate = new Date();
+                loadExpenses();
+                loadFinancialSummary(currentPeriod);
+            }
+        }
+
+        async function loadExpenses(filters = {}) {
+            let url = '/api/restaurant/expenses?';
+            if (filters.date) url += `date=${filters.date}&`;
+            if (filters.month) url += `month=${filters.month}&`;
+            if (filters.year) url += `year=${filters.year}&`;
+
+            const resp = await fetch(url);
+            const expenses = await resp.json();
+
+            const body = document.getElementById('expenseBody');
+            body.innerHTML = '';
+
+            expenses.forEach(exp => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${exp.name}</td>
+                    <td><span style="background: rgba(212,175,55,0.2); padding: 3px 8px; border-radius: 4px; font-size: 0.85rem;">${exp.category}</span></td>
+                    <td style="font-weight: 600; color: var(--res-primary);">₹${exp.amount}</td>
+                    <td>${exp.date}</td>
+                    <td style="text-align: center;">
+                        <button onclick="deleteExpense(${exp.id})" style="background: none; border: none; cursor: pointer; font-size: 1.2rem;">🗑️</button>
+                    </td>
+                `;
+                body.appendChild(tr);
+            });
+        }
+
+        async function deleteExpense(id) {
+            const confirmed = await JoyPopup.confirm('Delete this expense record?');
+            if (!confirmed) return;
+            await fetch(`/api/restaurant/expenses/delete/${id}`, { method: 'DELETE' });
+            loadExpenses();
+            loadFinancialSummary(currentPeriod);
+        }
+
+        async function loadFinancialSummary(period = 'today', filters = {}) {
+            currentPeriod = period;
+            let url = `/api/restaurant/financial_summary?period=${period}&`;
+            if (filters.date) url += `date=${filters.date}&`;
+            if (filters.month) url += `month=${filters.month}&`;
+            if (filters.year) url += `year=${filters.year}&`;
+
+            const resp = await fetch(url);
+            const data = await resp.json();
+
+            document.getElementById('totalRevenue').innerText = `₹${data.revenue.toFixed(2)}`;
+            document.getElementById('totalExpenses').innerText = `₹${data.expenses.toFixed(2)}`;
+            document.getElementById('netProfit').innerText = `₹${data.profit.toFixed(2)}`;
+
+            const profitCard = document.getElementById('profitCard');
+            if (data.profit >= 0) {
+                profitCard.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+            } else {
+                profitCard.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+            }
+        }
+
+        function updateSearchUI(type) {
+            const range = document.getElementById(type + 'Range').value;
+            const prefix = type === 'ledger' ? 'ledger' : 'expense';
+            const suffix = type === 'ledger' ? '' : 'Select';
+
+            // Elements
+            const dateInput = document.getElementById(prefix + 'Date' + suffix);
+            const monthInput = document.getElementById(prefix + 'Month' + suffix);
+            const yearInput = document.getElementById(prefix + 'Year' + suffix);
+
+            // Hide all
+            dateInput.style.display = 'none';
+            monthInput.style.display = 'none';
+            yearInput.style.display = 'none';
+
+            if (range === 'daily') dateInput.style.display = 'block';
+            if (range === 'monthly') monthInput.style.display = 'block';
+            if (range === 'yearly') yearInput.style.display = 'block';
+
+            if (range === 'today' || range === 'all') {
+                // Auto run search for presets
+                runSearch(type);
+            }
+        }
+
+        async function runSearch(type) {
+            const range = document.getElementById(type + 'Range').value;
+            const prefix = type === 'ledger' ? 'ledger' : 'expense';
+            const suffix = type === 'ledger' ? '' : 'Select';
+
+            const filters = {};
+            if (range === 'daily') filters.date = document.getElementById(prefix + 'Date' + suffix).value;
+            if (range === 'monthly') filters.month = document.getElementById(prefix + 'Month' + suffix).value;
+            if (range === 'yearly') filters.year = document.getElementById(prefix + 'Year' + suffix).value;
+
+            if (type === 'ledger') {
+                await loadLedger(filters);
+                await loadFinancialSummary(range, filters);
+            } else {
+                await loadExpenses(filters);
+            }
+        }
+
+        function populateYears() {
+            const currentYear = new Date().getFullYear();
+            const years = [];
+            for (let i = 0; i < 5; i++) years.push(currentYear - i);
+
+            ['ledgerYear', 'expenseYearSelect'].forEach(id => {
+                const el = document.getElementById(id);
+                el.innerHTML = '';
+                years.forEach(y => {
+                    const opt = document.createElement('option');
+                    opt.value = y;
+                    opt.innerText = y;
+                    el.appendChild(opt);
+                });
+            });
+        }
+
+        async function saveRestaurantProfile() {
+            const name = document.getElementById('restaurantProfileName').value;
+            const email = document.getElementById('restaurantProfileEmail').value;
+            const phone = document.getElementById('restaurantProfilePhone').value;
+
+            if (!name) return showToast('❌ Restaurant Name is required', 'error');
+
+            try {
+                const response = await fetch('/api/settings/hotel_profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, phone })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showToast('✅ Profile updated successfully!', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showToast('❌ ' + (result.message || 'Error updating profile'), 'error');
+                }
+            } catch (e) {
+                showToast('❌ Connection error', 'error');
+            }
+        }
+
+        async function filterFinancials(period) {
+            await loadFinancialSummary(period);
+        }
+
+        // Initial Load
+        window.onload = () => {
+            loadTables();
+            loadPOSData();
+            loadLedger();
+            loadExpenses();
+            loadFinancialSummary('today');
+            populateYears();
+            // Set expense date to today
+            document.getElementById('expenseDate').valueAsDate = new Date();
+        };
+    </script>
+    <div class="help-trigger" onclick="showHelp('support')">i</div>
+
+    <!-- JoyPopup Structure -->
+    <div id="joyPopupOverlay" class="joy-popup-overlay">
+        <div class="joy-popup-box">
+            <div id="joyPopupIconBox" class="joy-popup-icon-container">
+                <span id="joyPopupIcon">✅</span>
+            </div>
+            <h3 id="joyPopupTitle">Notification</h3>
+            <p id="joyPopupMessage">Message details go here.</p>
+            <div id="joyPopupInputContainer" style="display: none;">
+                <input type="text" id="joyPopupInput" class="joy-popup-input" placeholder="Enter value...">
+            </div>
+            <div class="joy-popup-actions">
+                <button id="joyPopupPrimaryBtn" class="joy-btn joy-btn-primary">OK</button>
+                <button id="joyPopupSecondaryBtn" class="joy-btn joy-btn-secondary"
+                    style="display: none;">Cancel</button>
+            </div>
+        </div> <!-- End joy-popup-box -->
+    </div> <!-- End joyPopupOverlay -->
+
+    </div> <!-- End main-container -->
+    </div> <!-- End sidebar-content -->
+    </div> <!-- End dashboard-shell -->
+
+    <script>
+        function openSidebar() {
+            const sidebar = document.getElementById('dashSidebar');
+            if (sidebar) sidebar.classList.add('open');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (overlay) overlay.classList.add('show');
+        }
+
+        function closeSidebar() {
+            const sidebar = document.getElementById('dashSidebar');
+            if (sidebar) sidebar.classList.remove('open');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (overlay) overlay.classList.remove('show');
+        }
+
+        // Enhancement for showPage to handle sidebar active state
+        if (typeof window.showPage === 'function') {
+            const originalShowPage = window.showPage;
+            window.showPage = function(pageId, btn) {
+                originalShowPage(pageId);
+                
+                // Update sidebar active states
+                if (btn && btn.classList.contains('sidebar-nav-item')) {
+                    document.querySelectorAll('.sidebar-nav-item').forEach(item => item.classList.remove('active'));
+                    btn.classList.add('active');
+                }
+
+                // Auto-close sidebar on mobile after navigation
+                if (window.innerWidth <= 900) {
+                    closeSidebar();
+                }
+            };
+        }
+    </script>
+</body>
+
+</html>

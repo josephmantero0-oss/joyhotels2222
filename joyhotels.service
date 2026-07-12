@@ -1,0 +1,14 @@
+[Unit]
+Description=Gunicorn instance to serve JoyHotels
+After=network.target
+
+[Service]
+User=root
+Group=www-data
+WorkingDirectory=/var/www/joyhotels
+Environment="PATH=/var/www/joyhotels/venv/bin"
+ExecStart=/var/www/joyhotels/venv/bin/gunicorn --workers 3 --bind unix:joyhotels.sock -m 007 wsgi:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

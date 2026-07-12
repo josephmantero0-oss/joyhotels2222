@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin Command Center - JoyHotels</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --sidebar-width: 260px;
+        }
+
+        body {
+            display: flex;
+            background: #0f172a;
+            color: #f8fafc;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar Style */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #1e293b;
+            height: 100vh;
+            padding: 2rem 1rem;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid rgba(212, 175, 55, 0.2);
+            position: fixed;
+            left: 0;
+            top: 0;
+        }
+
+        .sidebar-brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--gold);
+            margin-bottom: 3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-item {
+            padding: 1rem 1.25rem;
+            border-radius: 12px;
+            color: #94a3b8;
+            text-decoration: none;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--gold);
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            padding: 2rem;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        /* Dashboard Highlights */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: #1e293b;
+            padding: 1.5rem;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        /* Tabs Section */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Tables & Lists */
+        .admin-card {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 10px;
+        }
+
+        th {
+            text-align: left;
+            padding: 1rem;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        td {
+            padding: 1rem;
+            background: rgba(15, 23, 42, 0.5);
+            border-top: 1px solid rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+        }
+
+        td:first-child {
+            border-radius: 12px 0 0 12px;
+            border-left: 1px solid rgba(255, 255, 255, 0.02);
+        }
+
+        td:last-child {
+            border-radius: 0 12px 12px 0;
+            border-right: 1px solid rgba(255, 255, 255, 0.02);
+        }
+
+        .status-pill {
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e;
+        }
+
+        .status-pending {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+        }
+
+        .status-suspended {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+
+        .search-bar {
+            background: #0f172a;
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            width: 300px;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Charts */
+        .charts-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-box {
+            background: #1e293b;
+            padding: 1.5rem;
+            border-radius: 16px;
+            height: 350px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .modal-content {
+            background: #1e293b;
+            padding: 2.5rem;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        /* Help System */
+        .help-trigger {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 3.5rem;
+            height: 3.5rem;
+            background: var(--gold);
+            color: #1e293b;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .help-trigger:hover {
+            transform: scale(1.1);
+        }
+
+        .guide-step {
+            margin-bottom: 1.5rem;
+            padding-left: 1rem;
+            border-left: 3px solid var(--gold);
+        }
+
+        .guide-step h4 {
+            color: var(--gold);
+            margin-bottom: 0.5rem;
+        }
+
+        .guide-step p {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-brand">
+            <span>👑 JoyHotels</span>
+        </div>
+        <div class="nav-item active" onclick="switchTab('dashboard')">📊 Dashboard</div>
+        <div class="nav-item" onclick="switchTab('hotels')">🏨 Manage Hotels</div>
+        <div class="nav-item" onclick="switchTab('payments')">💰 Transaction Logs</div>
+        <div class="nav-item" onclick="switchTab('messages')">💬 Support Inbox</div>
+        <div class="nav-item" onclick="switchTab('broadcast')">📢 Broadcast</div>
+
+        <div style="flex: 1;"></div>
+
+        <a href="/logout" class="nav-item"
+            style="color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); margin-top: auto;">
+            <span>🚪</span> Logout Account
+        </a>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Dashboard Tab -->
+        <div id="tab-dashboard" class="tab-content active">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h1>Command Center Overview</h1>
+                <a href="/logout" class="btn btn-outline" style="color: #ef4444; border-color: #ef4444;">🚪 Logout
+                    System</a>
+            </div>
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <span class="stat-label">Total Hotels</span>
+                    <span class="stat-value" id="stat-total-hotels">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Active Users</span>
+                    <span class="stat-value" id="stat-active-hotels">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Pending Approval</span>
+                    <span class="stat-value" id="stat-pending-hotels">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Total Revenue</span>
+                    <span class="stat-value" id="stat-revenue">₹0</span>
+                </div>
+            </div>
+
+            <div class="charts-container">
+                <div class="chart-box">
+                    <h3 style="margin-bottom: 1rem; color: var(--gold);">Revenue Growth (6 Months)</h3>
+                    <canvas id="revenueChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <h3 style="margin-bottom: 1rem; color: var(--gold);">Quick Actions</h3>
+                    <button class="btn btn-primary btn-full" style="margin-bottom: 10px;"
+                        onclick="switchTab('hotels')">Review Pending Approvals</button>
+                    <button class="btn btn-outline btn-full" onclick="switchTab('messages')">Check Support
+                        Tickets</button>
+                    <div style="margin-top: 2rem; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 12px;">
+                        <p style="font-size: 0.875rem; color: #94a3b8;">System Status: <span
+                                style="color: #22c55e;">Online</span></p>
+                        <p style="font-size: 0.875rem; color: #94a3b8; margin-top: 5px;">Server Location: India</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hotels Tab -->
+        <div id="tab-hotels" class="tab-content">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                <h1>Manage Hotels</h1>
+                <input type="text" placeholder="Search by name, email, or UTR..." class="search-bar"
+                    onkeyup="filterHotels(this.value)">
+            </div>
+            <div class="admin-card">
+                <table id="hotelTable">
+                    <thead>
+                        <tr>
+                            <th>Hotel Name</th>
+                            <th>Contact Info</th>
+                            <th>Plan / UTR</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hotelList">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Payments Tab -->
+        <div id="tab-payments" class="tab-content">
+            <h1>Transaction History</h1>
+            <div class="admin-card" style="margin-top: 1.5rem;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Hotel</th>
+                            <th>Plan</th>
+                            <th>Amount</th>
+                            <th>UTR Reference</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionList">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Messages Tab -->
+        <div id="tab-messages" class="tab-content">
+            <h1>Support Inbox</h1>
+            <div class="admin-card" style="margin-top: 1.5rem;">
+                <table id="msgTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Hotel</th>
+                            <th>Subject</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="messageList">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Broadcast Tab -->
+    <div id="tab-broadcast" class="tab-content">
+        <h1>📢 Global Broadcast</h1>
+        <p style="color: #94a3b8; margin-bottom: 2rem;">Send a system-wide announcement to all hotel dashboards.</p>
+
+        <div class="admin-card" style="max-width: 600px;">
+            <div class="form-group">
+                <label>Announcement Message</label>
+                <textarea id="broadcastMsg" class="form-control" rows="4"
+                    style="width: 100%; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; margin-top: 0.5rem;"
+                    placeholder="e.g. System maintenance scheduled for tonight..."></textarea>
+            </div>
+
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label>Type</label>
+                <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                    <button class="btn btn-outline" onclick="setBroadcastType(this, 'info')" id="type-info"
+                        style="border-color: #3b82f6; color: #3b82f6;">ℹ️ Info</button>
+                    <button class="btn btn-outline" onclick="setBroadcastType(this, 'warning')" id="type-warning"
+                        style="border-color: #f59e0b; color: #f59e0b;">⚠️ Warning</button>
+                    <button class="btn btn-outline" onclick="setBroadcastType(this, 'success')" id="type-success"
+                        style="border-color: #22c55e; color: #22c55e;">✅ Success</button>
+                </div>
+            </div>
+
+            <button class="btn btn-primary btn-full" style="margin-top: 2rem;" onclick="sendBroadcast()">🚀 Send
+                Announcement</button>
+        </div>
+    </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-content">
+            <h2 style="color: var(--gold); margin-bottom: 1.5rem;">Confirm & Approve</h2>
+            <div class="form-group">
+                <label>Verified Amount (₹)</label>
+                <input type="number" id="payAmount" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>Subscription Plan</label>
+                <select id="payPlan" class="form-control">
+                    <option value="hotel">Hotel Pro (Monthly)</option>
+                    <option value="hotel_yearly">Hotel Pro (Yearly)</option>
+                    <option value="restaurant">Restaurant Pro (Monthly)</option>
+                    <option value="restaurant_yearly">Restaurant Pro (Yearly)</option>
+                    <option value="both">Ultimate Bundle (Monthly)</option>
+                    <option value="both_yearly">Ultimate Bundle (Yearly)</option>
+                </select>
+            </div>
+            <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+                <button class="btn btn-outline btn-full" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary btn-full" onclick="submitPayment()">✅ Activate Account</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="helpModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 style="color: var(--gold); margin-bottom: 1.5rem;">📖 Staff Ready Guide</h2>
+
+            <div class="guide-step">
+                <h4>🏨 Hotel Management</h4>
+                <p>Verify new hotels by checking their UTR reference. Once verified, set their amount and plan to
+                    activate them.</p>
+            </div>
+
+            <div class="guide-step">
+                <h4>💰 Payments & Logs</h4>
+                <p>Track all incoming revenue from different hotels. Use Transaction Logs to reconcile bank statements.
+                </p>
+            </div>
+
+            <div class="guide-step">
+                <h4>💬 Support Inbox</h4>
+                <p>Reply to hotel owners directly. Mark queries as 'Resolved' once you've assisted them.</p>
+            </div>
+
+            <div class="guide-step">
+                <h4>🚪 Account Safety</h4>
+                <p>Always use the Logout button at the bottom of the sidebar before leaving the station.</p>
+            </div>
+
+            <button class="btn btn-primary btn-full" style="margin-top: 1rem;"
+                onclick="document.getElementById('helpModal').style.display='none'">Got it, thanks!</button>
+        </div>
+    </div>
+
+    <div class="help-trigger" onclick="document.getElementById('helpModal').style.display='flex'">i</div>
+
+    <script>
+        let currentHotelId = null;
+        let currentMsgId = null;
+        let chartInstance = null;
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
+
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            const navItem = Array.from(document.querySelectorAll('.nav-item')).find(item => item.textContent.toLowerCase().includes(tabId));
+            if (navItem) navItem.classList.add('active');
+
+            if (tabId === 'dashboard') loadStats();
+            if (tabId === 'hotels') loadHotels();
+            if (tabId === 'payments') loadTransactions();
+            if (tabId === 'messages') loadMessages();
+        }
+
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/super/stats');
+                const data = await res.json();
+
+                document.getElementById('stat-total-hotels').innerText = data.total_hotels;
+                document.getElementById('stat-active-hotels').innerText = data.active_hotels;
+                document.getElementById('stat-pending-hotels').innerText = data.pending_hotels;
+                document.getElementById('stat-revenue').innerText = '₹' + data.total_revenue.toLocaleString();
+
+                renderChart(data.revenue_chart);
+            } catch (e) { console.error(e); }
+        }
+
+        function renderChart(chartData) {
+            const ctx = document.getElementById('revenueChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.map(d => d[0]),
+                    datasets: [{
+                        label: 'Revenue (₹)',
+                        data: chartData.map(d => d[1]),
+                        borderColor: '#D4AF37',
+                        backgroundColor: 'rgba(212, 175, 55, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadHotels() {
+            const res = await fetch('/api/super/hotels');
+            const hotels = await res.json();
+            window.allHotels = hotels; // Save for filtering
+            displayHotels(hotels);
+        }
+
+        function displayHotels(hotels) {
+            const list = document.getElementById('hotelList');
+            list.innerHTML = hotels.map(h => `
+                <tr>
+                    <td>
+                        <div style="font-weight: 600; color: var(--gold);">${h.name}</div>
+                        <div style="font-size: 0.75rem; color: #64748b;">ID: #${h.id} | Joined: ${h.created_at}</div>
+                    </td>
+                    <td style="font-size: 0.875rem;">
+                        📧 ${h.email}<br>📞 ${h.phone}
+                    </td>
+                    <td>
+                        <div style="font-weight: 600; color: #94a3b8; text-transform: uppercase; font-size: 0.75rem;">
+                            ${h.is_restaurant_active ? '🍽️ RESTAURANT' : ''} ${h.is_hotel_active ? '🏨 HOTEL' : ''}
+                        </div>
+                        <div style="text-transform: capitalize; color: var(--gold);">${h.plan.replace('_', ' ')}</div>
+                        <div style="font-size: 0.75rem; color: #64748b;">UTR: ${h.utr_ref}</div>
+                    </td>
+                    <td>
+                        <span class="status-pill ${h.is_active ? 'status-active' : (h.expiry_date ? 'status-suspended' : 'status-pending')}">
+                            ${h.is_active ? 'Active' : (h.expiry_date ? 'Suspended' : 'Pending')}
+                        </span>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 8px;">
+                            <a href="/api/super/impersonate/${h.id}" class="btn btn-outline btn-sm" title="Login as this Hotel" onclick="return confirm('👻 Login as ${h.name}? You will see their dashboard.')">👻 Login</a>
+                            ${!h.is_active ?
+                    `<button class="btn btn-primary btn-sm" onclick="openPaymentModal(${h.id}, '${h.plan}')">Verify</button>` :
+                    `<button class="btn btn-outline btn-sm" style="color: #ef4444; border-color: #ef4444;" onclick="toggleStatus(${h.id}, 0)">Suspend</button>`
+                }
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function filterHotels(q) {
+            const filtered = window.allHotels.filter(h =>
+                h.name.toLowerCase().includes(q.toLowerCase()) ||
+                h.email.toLowerCase().includes(q.toLowerCase()) ||
+                h.utr_ref.toLowerCase().includes(q.toLowerCase())
+            );
+            displayHotels(filtered);
+        }
+
+        async function loadTransactions() {
+            const res = await fetch('/api/super/transactions');
+            const data = await res.json();
+            document.getElementById('transactionList').innerHTML = data.map(t => `
+                <tr>
+                    <td>${t.date}</td>
+                    <td>${t.hotel_name}</td>
+                    <td style="text-transform: capitalize;">${t.plan}</td>
+                    <td style="color: var(--gold); font-weight: 600;">₹${t.amount}</td>
+                    <td><code>${t.utr_ref}</code></td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadMessages() {
+            const res = await fetch('/api/super/messages');
+            const data = await res.json();
+            window.allMessages = data;
+            document.getElementById('messageList').innerHTML = data.map(m => `
+                <tr>
+                    <td>${m.created_at.split(' ')[0]}</td>
+                    <td>${m.hotel_name}</td>
+                    <td>${m.subject}</td>
+                    <td>
+                        <span class="status-pill ${m.status === 'pending' ? 'status-pending' : 'status-active'}">
+                            ${m.status === 'pending' ? 'Unread/New' : 'Resolved'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" onclick="viewMessage(${m.id})">Read</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function viewMessage(id) {
+            const msg = window.allMessages.find(m => m.id === id);
+            currentMsgId = id;
+            document.getElementById('viewMsgSubject').innerText = msg.subject;
+            document.getElementById('viewMsgHotel').innerText = `From: ${msg.hotel_name} (${msg.created_at})`;
+            document.getElementById('viewMsgBody').innerText = msg.message;
+            document.getElementById('resolveBtn').style.display = msg.status === 'pending' ? 'block' : 'none';
+            document.getElementById('msgViewModal').style.display = 'flex';
+        }
+
+        async function resolveMessage() {
+            const res = await fetch('/api/super/message/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: currentMsgId, status: 'resolved' })
+            });
+            if ((await res.json()).success) {
+                document.getElementById('msgViewModal').style.display = 'none';
+                loadMessages();
+            }
+        }
+
+        // --- Helper Logic (From Previous Version) ---
+        function openPaymentModal(id, plan) {
+            currentHotelId = id;
+            document.getElementById('payPlan').value = plan;
+
+            // Auto-fill price suggestion
+            const prices = {
+                'restaurant': 199, 'restaurant_yearly': 1999,
+                'hotel': 299, 'hotel_yearly': 2999,
+                'both': 399, 'both_yearly': 3999
+            };
+            document.getElementById('payAmount').value = prices[plan] || 299;
+            document.getElementById('paymentModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('paymentModal').style.display = 'none';
+        }
+
+        async function submitPayment() {
+            const amount = document.getElementById('payAmount').value;
+            const plan = document.getElementById('payPlan').value;
+            try {
+                const res = await fetch('/api/super/record_payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ hotel_id: currentHotelId, amount, plan, utr_ref: 'SUPER_APPROVED' })
+                });
+                if ((await res.json()).success) {
+                    closeModal();
+                    loadHotels();
+                    loadStats();
+                }
+            } catch (err) { alert('Error recording payment'); }
+        }
+
+        async function toggleStatus(id, status) {
+            if (!confirm(`Are you sure you want to ${status ? 'activate' : 'suspend'} this hotel?`)) return;
+            try {
+                const res = await fetch('/api/super/toggle_status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ hotel_id: id, status: status })
+                });
+                if ((await res.json()).success) loadHotels();
+            } catch (err) { alert('Error toggling status'); }
+        }
+
+        // --- Broadcast Logic ---
+        let currentBroadcastType = 'info';
+
+        function setBroadcastType(btn, type) {
+            currentBroadcastType = type;
+            // Reset styles
+            document.querySelectorAll('#tab-broadcast .btn-outline').forEach(b => b.style.background = 'transparent');
+            // Highlight active
+            btn.style.background = 'rgba(255,255,255,0.1)';
+        }
+
+        async function sendBroadcast() {
+            const msg = document.getElementById('broadcastMsg').value;
+            if (!msg) return alert('Please write a message!');
+
+            try {
+                const res = await fetch('/api/super/announce', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: msg, type: currentBroadcastType })
+                });
+                if ((await res.json()).success) {
+                    alert('Announcement Sent! 🚀');
+                    document.getElementById('broadcastMsg').value = '';
+                }
+            } catch (e) { alert('Failed to send'); }
+        }
+
+        if (tabId === 'broadcast') { /* No loads needed */ }
+
+        // Initialize
+        loadStats();
+    </script>
+</body>
+
+</html>
