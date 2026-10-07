@@ -24,12 +24,18 @@ app = Flask(__name__)
 # Fix for running behind Nginx proxy (ensures correct URL generation on VPS)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 # Secure stable secret key for sessions
+# On Vercel the filesystem is read-only except /tmp
+IS_VERCEL = os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV')
+DB_PATH = '/tmp/hotel.db' if IS_VERCEL else os.environ.get('DATABASE', 'hotel.db')
+DEFAULT_UPLOAD = '/tmp/uploads' if IS_VERCEL else 'static/uploads'
+
 def get_db_connection():
-    db_path = app.config.get('DATABASE', 'hotel.db')
+    db_path = app.config.get('DATABASE', DB_PATH)
     return sqlite3.connect(db_path)
+app.config['DATABASE'] = DB_PATH
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_key_845372_change_this_in_production')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365) # Persistent login for 1 year
-app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'static/uploads')
+app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', DEFAULT_UPLOAD)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Create upload folder if it doesn't exist
