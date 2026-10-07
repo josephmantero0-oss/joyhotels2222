@@ -1,0 +1,13 @@
+.venv/
+.pytest_cache/
+__pycache__/
+temp_backup/
+temp_backup_29/
+temp_backups/
+backups/
+tests/
+android-app/
+*.db
+*.sqlite
+*.sqlite3
+guest_data_export.pdf
