@@ -9,13 +9,16 @@ __pycache__/
 .pytest_cache/
 
 # Databases and Backups
-*.db
+# hotel.db is included intentionally for Vercel seeding
 *.sqlite
 *.sqlite3
 *.db.backup_delete
 *.db.pre_restore
 temp_backup/
 temp_backup_29/
+temp_backups/
+joyhotels.db
+test_hotel.db
 
 # Environment Variables (Security)
 .env

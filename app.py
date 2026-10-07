@@ -29,10 +29,19 @@ IS_VERCEL = os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV')
 DB_PATH = '/tmp/hotel.db' if IS_VERCEL else os.environ.get('DATABASE', 'hotel.db')
 DEFAULT_UPLOAD = '/tmp/uploads' if IS_VERCEL else 'static/uploads'
 
+# Seed /tmp/hotel.db from the bundled repo file on first Vercel startup
+if IS_VERCEL and not os.path.exists('/tmp/hotel.db'):
+    bundled = os.path.join(os.path.dirname(__file__), 'hotel.db')
+    if os.path.exists(bundled):
+        import shutil as _shutil
+        _shutil.copy2(bundled, '/tmp/hotel.db')
+        print("[Vercel] Seeded /tmp/hotel.db from bundled hotel.db")
+
 def get_db_connection():
     db_path = app.config.get('DATABASE', DB_PATH)
     return sqlite3.connect(db_path)
 app.config['DATABASE'] = DB_PATH
+
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_key_845372_change_this_in_production')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365) # Persistent login for 1 year
 app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', DEFAULT_UPLOAD)
