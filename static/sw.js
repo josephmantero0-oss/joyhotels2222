@@ -1,4 +1,4 @@
-const CACHE_NAME = 'joyhotels-v1.0';
+const CACHE_NAME = 'joyhotels-v1.1';
 
 // Assets to precache immediately on install
 const PRECACHE_ASSETS = [

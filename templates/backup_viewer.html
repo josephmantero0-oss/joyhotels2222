@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JoyHotels - Backup Viewer</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --bg-color: #f8fafc;
+            --text-color: #1e293b;
+            --border-color: #e2e8f0;
+            --card-bg: #ffffff;
+        }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+        }
+        .tab-btn {
+            padding: 10px 20px;
+            margin-right: 10px;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        .tab-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th {
+            background: #f1f5f9;
+            font-weight: 600;
+        }
+        .photo-thumb {
+            max-width: 60px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        .photo-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        /* Modal for viewing large photos */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.show {
+            display: flex;
+        }
+        .modal img {
+            max-width: 90%;
+            max-height: 90vh;
+            border-radius: 8px;
+        }
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 30px;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>📦 Backup Viewer</h1>
+            <p style="margin: 5px 0 0 0; color: #64748b;">Viewing historical backup data. This does not affect live system data.</p>
+        </div>
+        <div>
+            <button class="tab-btn active" onclick="showTab('bookings')">Bookings History</button>
+            <button class="tab-btn" onclick="showTab('guests')">Guest Records</button>
+        </div>
+    </div>
+
+    <div id="bookings-tab" class="tab-content">
+        <table>
+            <thead>
+                <tr>
+                    <th>Rooms</th>
+                    <th>Guest Name</th>
+                    <th>Phone</th>
+                    <th>Address</th>
+                    <th>ID Photos</th>
+                    <th>Check-in</th>
+                    <th>Check-out</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="bookings-body">
+                <tr><td colspan="8" style="text-align:center;">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="guests-tab" class="tab-content" style="display: none;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>ID Number</th>
+                    <th>Address</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="guests-body">
+                <tr><td colspan="5" style="text-align:center;">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Photo Modal -->
+    <div id="photoModal" class="modal" onclick="this.classList.remove('show')">
+        <button class="close-btn">&times;</button>
+        <img id="modalImg" src="" onclick="event.stopPropagation()">
+    </div>
+
+    <script>
+        const backupId = "{{ backup_id }}";
+        
+        async function loadBackupData() {
+            try {
+                const res = await fetch(`/api/backup/data/${backupId}`);
+                const data = await res.json();
+                
+                if (data.success) {
+                    renderBookings(data.bookings);
+                    renderGuests(data.guests);
+                } else {
+                    alert('Error loading backup data: ' + data.message);
+                }
+            } catch (err) {
+                alert('Network error loading data');
+            }
+        }
+
+        function getPhotoHtml(photoPathsStr) {
+            if (!photoPathsStr) return 'No photos';
+            const paths = photoPathsStr.split(',');
+            return `<div class="photo-container">` + paths.map(path => {
+                const fullUrl = `/backup_viewer/media/${backupId}/${path}`;
+                return `<img src="${fullUrl}" class="photo-thumb" onclick="openPhoto('${fullUrl}')" title="Click to view">`;
+            }).join('') + `</div>`;
+        }
+
+        function renderBookings(bookings) {
+            const tbody = document.getElementById('bookings-body');
+            tbody.innerHTML = '';
+            
+            if (bookings.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No bookings found in this backup.</td></tr>';
+                return;
+            }
+            
+            bookings.forEach(b => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${b.room_ids || 'Unknown'}</strong></td>
+                    <td>${b.guest_name}</td>
+                    <td>${b.phone}</td>
+                    <td>${b.address}</td>
+                    <td>${getPhotoHtml(b.id_photo)}</td>
+                    <td>${b.checkin_time}</td>
+                    <td>${b.checkout_time || 'N/A'}</td>
+                    <td><span style="padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; background: ${b.status === 'active' ? '#dcfce7; color: #166534;' : '#f1f5f9; color: #475569;'}">${b.status.toUpperCase()}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderGuests(guests) {
+            const tbody = document.getElementById('guests-body');
+            tbody.innerHTML = '';
+            
+            if (guests.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No guests found in this backup.</td></tr>';
+                return;
+            }
+            
+            guests.forEach(g => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${g.name}</strong></td>
+                    <td>${g.phone}</td>
+                    <td>${g.id_number}</td>
+                    <td>${g.address}</td>
+                    <td>${g.status}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function showTab(tabName) {
+            document.getElementById('bookings-tab').style.display = tabName === 'bookings' ? 'block' : 'none';
+            document.getElementById('guests-tab').style.display = tabName === 'guests' ? 'block' : 'none';
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function openPhoto(url) {
+            document.getElementById('modalImg').src = url;
+            document.getElementById('photoModal').classList.add('show');
+        }
+
+        // Init
+        loadBackupData();
+    </script>
+</body>
+</html>

@@ -5,258 +5,488 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Check-in / चेक-इन - {{ hotel_name }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            background: linear-gradient(135deg, #0b0f19 0%, #0f172a 50%, #1a2340 100%);
             min-height: 100vh;
             color: #f1f5f9;
         }
 
         .container {
-            max-width: 480px;
+            max-width: 860px;
             margin: 0 auto;
-            padding: 1.5rem;
+            padding: 2rem 1.5rem 4rem;
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
         }
 
-        /* Header */
+        /* ── HEADER ── */
         .header {
             text-align: center;
-            padding: 2rem 0 1.5rem;
+            padding: 2.5rem 0 2rem;
         }
 
         .hotel-icon {
-            width: 70px;
-            height: 70px;
+            width: 88px;
+            height: 88px;
             background: linear-gradient(135deg, #d4af37, #b8860b);
-            border-radius: 20px;
+            border-radius: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
-            margin: 0 auto 1rem;
-            box-shadow: 0 10px 30px rgba(212, 175, 55, 0.3);
+            font-size: 2.8rem;
+            margin: 0 auto 1.25rem;
+            box-shadow: 0 12px 40px rgba(212, 175, 55, 0.35);
         }
 
         .hotel-name {
-            font-size: 1.4rem;
-            font-weight: 800;
+            font-size: 2rem;
+            font-weight: 900;
             color: #d4af37;
-            margin-bottom: 0.25rem;
+            letter-spacing: -0.5px;
+            margin-bottom: 0.4rem;
         }
 
         .subtitle {
             color: #94a3b8;
-            font-size: 0.9rem;
+            font-size: 1.05rem;
+            font-weight: 500;
         }
 
-        /* Form Card */
+        /* ── FORM CARD ── */
         .form-card {
-            background: rgba(30, 41, 59, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 20px;
-            padding: 1.75rem;
-            backdrop-filter: blur(10px);
-            flex: 1;
+            background: rgba(21, 28, 44, 0.9);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            border-radius: 28px;
+            padding: 2.5rem;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 30px 80px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255,255,255,0.04);
+            margin-bottom: 1.5rem;
         }
 
         .form-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            margin-bottom: 1.5rem;
-            color: #f1f5f9;
+            font-size: 1.4rem;
+            font-weight: 800;
+            margin-bottom: 2rem;
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 1.25rem;
         }
 
-        .form-group {
-            margin-bottom: 1.25rem;
+        /* ── GRID ── */
+        .form-grid-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
         }
+
+        @media (max-width: 620px) {
+            .form-grid-2col { grid-template-columns: 1fr; }
+            .form-card { padding: 1.5rem; }
+            .container { padding: 1rem 1rem 3rem; }
+        }
+
+        /* ── FORM ELEMENTS ── */
+        .form-group { margin-bottom: 1.5rem; }
 
         .form-label {
-            display: block;
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: #94a3b8;
-            margin-bottom: 0.4rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #cbd5e1;
+            margin-bottom: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .form-label .hindi {
             color: #d4af37;
-            font-weight: 500;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: none;
+            letter-spacing: 0;
         }
 
         .form-input {
             width: 100%;
-            padding: 0.9rem 1rem;
-            background: rgba(15, 23, 42, 0.6);
+            padding: 1.1rem 1.25rem;
+            background: rgba(10, 16, 35, 0.8);
             border: 1.5px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            color: #f1f5f9;
-            font-size: 1rem;
+            border-radius: 16px;
+            color: #f8fafc;
+            font-size: 1.05rem;
             font-family: 'Inter', sans-serif;
-            transition: border-color 0.3s;
+            transition: all 0.3s ease;
         }
 
         .form-input:focus {
             outline: none;
             border-color: #d4af37;
-            box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+            box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.18);
+            background: rgba(10, 16, 35, 0.95);
         }
 
-        .form-input::placeholder {
-            color: #64748b;
+        .form-input::placeholder { color: #475569; }
+        .form-input option { background: #1e293b; }
+
+        /* ── PHOTO UPLOAD ── */
+        .photo-upload-zone {
+            border: 2.5px dashed rgba(212, 175, 55, 0.4);
+            border-radius: 20px;
+            overflow: hidden;
+            background: rgba(212, 175, 55, 0.03);
+            transition: all 0.3s;
         }
 
-        /* Photo Upload */
-        .photo-upload {
-            border: 2px dashed rgba(212, 175, 55, 0.3);
-            border-radius: 16px;
-            padding: 1.5rem;
+        .photo-upload-zone:hover {
+            border-color: #d4af37;
+            background: rgba(212, 175, 55, 0.07);
+        }
+
+        .upload-inner {
+            padding: 2rem 1.5rem;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s;
-            background: rgba(212, 175, 55, 0.03);
         }
 
-        .photo-upload:hover, .photo-upload.active {
-            border-color: #d4af37;
-            background: rgba(212, 175, 55, 0.08);
-        }
-
-        .photo-upload .icon {
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .photo-upload .label {
-            font-size: 0.9rem;
-            color: #94a3b8;
-        }
-
-        .photo-upload .label strong {
-            color: #d4af37;
-        }
-
-        .photo-preview {
-            display: none;
-            margin-top: 0.75rem;
-        }
-
-        .photo-preview img {
-            max-width: 100%;
-            max-height: 200px;
-            border-radius: 12px;
-            border: 2px solid rgba(212, 175, 55, 0.3);
-        }
-
-        .photo-preview .change-btn {
+        .upload-icon {
+            font-size: 3.5rem;
             display: block;
-            margin-top: 0.5rem;
-            font-size: 0.8rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .upload-title {
+            font-size: 1.05rem;
+            font-weight: 700;
             color: #d4af37;
-            cursor: pointer;
+            margin-bottom: 0.4rem;
+        }
+
+        .upload-subtitle {
+            font-size: 0.85rem;
+            color: #64748b;
+            line-height: 1.5;
+        }
+
+        /* Upload button row */
+        .upload-btn-row {
+            display: flex;
+            border-top: 1px solid rgba(212, 175, 55, 0.2);
+        }
+
+        .upload-btn-opt {
+            flex: 1;
+            padding: 1rem;
             background: none;
             border: none;
-            text-decoration: underline;
-        }
-
-        /* Submit Button */
-        .submit-btn {
-            width: 100%;
-            padding: 1rem;
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-            border: none;
-            border-radius: 14px;
-            font-size: 1.1rem;
-            font-weight: 700;
             cursor: pointer;
-            margin-top: 0.5rem;
+            color: #94a3b8;
             font-family: 'Inter', sans-serif;
-            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
-            transition: all 0.3s;
+            font-size: 0.9rem;
+            font-weight: 700;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
         }
 
-        .submit-btn:hover {
+        .upload-btn-opt:hover { background: rgba(212, 175, 55, 0.12); color: #d4af37; }
+        .upload-btn-opt + .upload-btn-opt { border-left: 1px solid rgba(212, 175, 55, 0.2); }
+
+        /* ID Preview */
+        .id-preview {
+            display: none;
+            position: relative;
+        }
+
+        .id-preview img {
+            width: 100%;
+            max-height: 240px;
+            object-fit: contain;
+            display: block;
+            border-radius: 16px;
+        }
+
+        .id-preview-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            background: rgba(10, 16, 35, 0.8);
+            border-radius: 0 0 16px 16px;
+        }
+
+        .id-preview-bar .preview-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #10b981;
+        }
+
+        .change-photo-btn {
+            background: rgba(212, 175, 55, 0.2);
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            color: #d4af37;
+            font-size: 0.82rem;
+            font-weight: 700;
+            padding: 6px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+        }
+
+        .change-photo-btn:hover { background: rgba(212, 175, 55, 0.35); }
+
+        /* ── ADD MEMBER BUTTON ── */
+        .add-member-btn {
+            width: 100%;
+            padding: 1.4rem 2rem;
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(212, 175, 55, 0.05));
+            border: 2.5px dashed rgba(212, 175, 55, 0.5);
+            border-radius: 20px;
+            color: #d4af37;
+            font-size: 1.15rem;
+            font-weight: 800;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s;
+            margin-bottom: 1.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .add-member-btn:hover {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.1));
+            border-color: #d4af37;
             transform: translateY(-2px);
-            box-shadow: 0 12px 35px rgba(16, 185, 129, 0.4);
+            box-shadow: 0 8px 25px rgba(212, 175, 55, 0.2);
         }
 
-        .submit-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
+        /* ── MEMBER CARDS ── */
+        .member-card {
+            background: rgba(10, 16, 35, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 1.5rem;
+            margin-bottom: 1.25rem;
+            animation: fadeSlideIn 0.3s ease;
         }
 
-        /* Success Screen */
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .member-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+        }
+
+        .member-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #d4af37;
+        }
+
+        .remove-btn {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #fca5a5;
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-weight: 700;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .remove-btn:hover { background: rgba(239, 68, 68, 0.3); color: #fff; }
+
+        .member-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 500px) { .member-grid { grid-template-columns: 1fr; } }
+
+        .member-photo-full { grid-column: 1 / -1; }
+
+        /* Mini photo upload in member card */
+        .mini-upload-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 0.6rem;
+        }
+
+        .mini-upload-btn {
+            flex: 1;
+            padding: 1rem;
+            background: rgba(212, 175, 55, 0.08);
+            border: 2px dashed rgba(212, 175, 55, 0.35);
+            border-radius: 14px;
+            color: #d4af37;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .mini-upload-btn:hover { background: rgba(212, 175, 55, 0.18); }
+
+        .mini-preview-img {
+            display: none;
+            width: 100%;
+            max-height: 120px;
+            object-fit: contain;
+            border-radius: 12px;
+            border: 1.5px solid rgba(212, 175, 55, 0.3);
+        }
+
+        /* ── SUBMIT BUTTON ── */
+        .submit-btn {
+            width: 100%;
+            padding: 1.5rem 2rem;
+            background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+            color: #0b0f19;
+            border: none;
+            border-radius: 20px;
+            font-size: 1.3rem;
+            font-weight: 900;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 12px 35px rgba(212, 175, 55, 0.45);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            margin-top: 0.5rem;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-3px) scale(1.01);
+            box-shadow: 0 18px 50px rgba(212, 175, 55, 0.6);
+            background: linear-gradient(135deg, #e8c84a 0%, #d4af37 100%);
+        }
+
+        .submit-btn:active { transform: translateY(-1px); }
+        .submit-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* ── SECTION DIVIDER ── */
+        .section-divider {
+            border: none;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            margin: 2rem 0;
+        }
+
+        .section-heading {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #f1f5f9;
+            margin-bottom: 0.4rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-subheading {
+            font-size: 0.82rem;
+            color: #64748b;
+            margin-bottom: 1.25rem;
+            line-height: 1.5;
+        }
+
+        .required { color: #ef4444; }
+
+        /* ── VALIDATION ERROR ── */
+        .validation-error {
+            color: #ef4444;
+            font-size: 0.82rem;
+            margin-top: 0.5rem;
+            display: none;
+            padding: 10px 14px;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(239, 68, 68, 0.25);
+        }
+
+        .validation-error.show { display: block; }
+
+        /* ── SUCCESS SCREEN ── */
         .success-screen {
             display: none;
             text-align: center;
-            padding: 3rem 1rem;
-            flex: 1;
-            justify-content: center;
-            align-items: center;
+            padding: 4rem 1rem;
             flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
 
-        .success-screen.show {
-            display: flex;
-        }
+        .success-screen.show { display: flex; }
 
         .success-icon {
-            width: 100px;
-            height: 100px;
+            width: 110px;
+            height: 110px;
             background: linear-gradient(135deg, #10b981, #059669);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 3rem;
-            margin: 0 auto 1.5rem;
-            box-shadow: 0 15px 40px rgba(16, 185, 129, 0.35);
+            font-size: 3.5rem;
+            margin: 0 auto 1.75rem;
+            box-shadow: 0 15px 50px rgba(16, 185, 129, 0.4);
             animation: bounceIn 0.5s ease-out;
         }
 
         @keyframes bounceIn {
             0% { transform: scale(0); }
-            50% { transform: scale(1.15); }
+            55% { transform: scale(1.15); }
             100% { transform: scale(1); }
         }
 
         .success-title {
-            font-size: 1.5rem;
-            font-weight: 800;
+            font-size: 1.75rem;
+            font-weight: 900;
             color: #10b981;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
         }
 
         .success-message {
             color: #94a3b8;
             font-size: 1rem;
-            line-height: 1.6;
-            max-width: 320px;
+            line-height: 1.7;
+            max-width: 380px;
             margin: 0 auto;
         }
 
-        /* Footer */
+        /* ── FOOTER ── */
         .footer {
             text-align: center;
-            padding: 1.5rem 0;
-            color: #475569;
-            font-size: 0.75rem;
+            padding: 2rem 0 1rem;
+            color: #334155;
+            font-size: 0.8rem;
+            font-weight: 500;
         }
-
-        /* Required star */
-        .required { color: #ef4444; }
     </style>
 </head>
 
@@ -268,59 +498,140 @@
             <div class="subtitle">Guest Check-in / अतिथि चेक-इन</div>
         </div>
 
-        <!-- Form -->
+        <!-- Main Form Card -->
         <div class="form-card" id="formCard">
             <div class="form-title">📝 Fill Your Details / अपनी जानकारी भरें</div>
 
             <form id="checkinForm" enctype="multipart/form-data">
                 <input type="hidden" name="hotel_id" value="{{ hotel_id }}">
 
+                <!-- PRIMARY GUEST DETAILS -->
+                <div class="form-grid-2col">
+                    <div class="form-group">
+                        <label class="form-label">
+                            Full Name <span class="hindi">/ पूरा नाम</span>
+                            <span class="required">*</span>
+                        </label>
+                        <input type="text" name="guest_name" class="form-input" placeholder="e.g. Rajesh Kumar" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            Phone Number <span class="hindi">/ फोन नंबर</span>
+                            <span class="required">*</span>
+                        </label>
+                        <input type="tel" name="phone" class="form-input" placeholder="e.g. 9876543210" required
+                            pattern="[0-9]{10}" title="10 digit mobile number">
+                    </div>
+                </div>
+
+                <!-- SECOND GUEST NAME (OPTIONAL) -->
                 <div class="form-group">
-                    <label class="form-label">Full Name <span class="hindi">/ पूरा नाम</span> <span class="required">*</span></label>
-                    <input type="text" name="guest_name" class="form-input" placeholder="e.g. Rajesh Kumar" required>
+                    <label class="form-label">
+                        Second Guest Name <span class="hindi">/ दूसरा अतिथि नाम</span>
+                        <span style="color: #94a3b8; font-weight: 500;">(Optional / वैकल्पिक)</span>
+                    </label>
+                    <input type="text" name="second_guest_name" class="form-input" placeholder="e.g. Priya Sharma">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Phone Number <span class="hindi">/ फोन नंबर</span> <span class="required">*</span></label>
-                    <input type="tel" name="phone" class="form-input" placeholder="e.g. 9876543210" required
-                        pattern="[0-9]{10}" title="10 digit mobile number">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Address <span class="hindi">/ पता</span> <span class="required">*</span></label>
+                    <label class="form-label">
+                        Address <span class="hindi">/ पता</span>
+                        <span class="required">*</span>
+                    </label>
                     <input type="text" name="address" class="form-input" placeholder="City, State / शहर, राज्य" required>
                 </div>
 
+                <div class="form-grid-2col">
+                    <div class="form-group">
+                        <label class="form-label">
+                            ID Type <span class="hindi">/ पहचान पत्र</span>
+                        </label>
+                        <select name="id_type" class="form-input">
+                            <option value="">Select ID Type</option>
+                            <option value="aadhaar">Aadhaar Card</option>
+                            <option value="driving_licence">Driving Licence</option>
+                            <option value="voter_id">Voter ID</option>
+                            <option value="passport">Passport</option>
+                            <option value="pan">PAN Card</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            ID Number <span class="hindi">/ नंबर</span>
+                        </label>
+                        <input type="text" name="id_number" class="form-input" placeholder="e.g. XXXX-XXXX-XXXX">
+                    </div>
+                </div>
+
+                <!-- ID PHOTO UPLOAD -->
                 <div class="form-group">
-                    <label class="form-label">ID Photo <span class="hindi">/ पहचान पत्र फोटो</span> (Aadhaar / PAN / DL) <span class="required">*</span></label>
-                    <div class="photo-upload" id="photoUploadArea" onclick="document.getElementById('idPhotoInput').click()">
-                        <div class="icon">📸</div>
-                        <div class="label">
-                            <strong>Tap to Click / Upload Photo</strong><br>
-                            <span style="font-size: 0.8rem;">फोटो खींचें या अपलोड करें</span>
+                    <label class="form-label">
+                        ID Photo / पहचान पत्र फोटो
+                        <span class="hindi">(Aadhaar / DL / Voter)</span>
+                        <span class="required">*</span>
+                    </label>
+
+                    <div class="photo-upload-zone" id="photoUploadZone">
+                        <div class="upload-inner" onclick="document.getElementById('idGalleryInput').click()">
+                            <span class="upload-icon">📸</span>
+                            <div class="upload-title">Upload ID Photo / पहचान पत्र अपलोड करें</div>
+                            <div class="upload-subtitle">Tap to upload or take photo of Aadhaar / DL / Voter Card</div>
+                        </div>
+                        <div class="upload-btn-row">
+                            <button type="button" class="upload-btn-opt" onclick="document.getElementById('idCameraInput').click()">
+                                📷 Camera / कैमरा
+                            </button>
+                            <button type="button" class="upload-btn-opt" onclick="document.getElementById('idGalleryInput').click()">
+                                🖼️ Gallery / गैलरी
+                            </button>
                         </div>
                     </div>
-                    <input type="file" id="idPhotoInput" name="id_photo" accept="image/*"
-                        style="display: none;" onchange="previewPhoto(this)" required>
-                    <div class="photo-preview" id="photoPreview">
+
+                    <!-- Hidden inputs -->
+                    <input type="file" id="idGalleryInput" name="id_photo" accept="image/*" style="display:none;" onchange="showIdPreview(this)">
+                    <input type="file" id="idCameraInput" accept="image/*" capture="environment" style="display:none;" onchange="showIdPreview(this)">
+
+                    <!-- Preview -->
+                    <div class="id-preview" id="idPreview">
                         <img id="previewImg" src="" alt="ID Preview">
-                        <button type="button" class="change-btn" onclick="document.getElementById('idPhotoInput').click()">
-                            Change Photo / फोटो बदलें
-                        </button>
+                        <div class="id-preview-bar">
+                            <span class="preview-label">✅ ID Uploaded</span>
+                            <button type="button" class="change-photo-btn" onclick="resetIdPhoto()">
+                                🔄 Change / बदलें
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div class="form-group" id="membersGroup">
-                    <label class="form-label">Additional Members <span class="hindi">/ अन्य सदस्य</span></label>
-                    <div id="membersContainer"></div>
-                    <button type="button" class="change-btn" onclick="addMemberField()" style="margin-top: 0.5rem;">
-                        + Add Member / सदस्य जोड़ें
-                    </button>
-                    <input type="hidden" name="members" id="membersInput" value="[]">
+                <!-- MEMBERS SECTION -->
+                <hr class="section-divider">
+                <div class="section-heading">
+                    👥 Additional Members
+                    <span style="font-weight:500; color:#d4af37;">/ अन्य सदस्य</span>
+                </div>
+                <div class="section-subheading">
+                    Add all accompanying guests — each member needs Name, Phone &amp; ID Photo.<br>
+                    सभी साथी मेहमानों को जोड़ें — हर सदस्य का नाम, फोन और पहचान पत्र फोटो ज़रूरी है।
                 </div>
 
+                <div id="membersContainer"></div>
+
+                <!-- ADD MEMBER BUTTON -->
+                <button type="button" class="add-member-btn" onclick="addMember()">
+                    <span style="font-size:1.4rem;">➕</span>
+                    Add Member / सदस्य जोड़ें
+                </button>
+
+                <div class="validation-error" id="photoValidationError">
+                    ⚠️ When there are 2 or more guests, at least 2 ID photos are required.<br>
+                    जब 2 या अधिक मेहमान हों तो कम से कम 2 पहचान पत्र फोटो ज़रूरी हैं।
+                </div>
+
+                <!-- SUBMIT BUTTON -->
                 <button type="submit" class="submit-btn" id="submitBtn">
-                    ✅ Submit / जमा करें
+                    <span>✅</span> Submit Check-in / जमा करें
                 </button>
             </form>
         </div>
@@ -331,54 +642,190 @@
             <div class="success-title">Details Submitted!</div>
             <div class="success-message">
                 आपकी जानकारी भेज दी गई है।<br>
-                Your details have been sent to the front desk. Please wait for confirmation.
-                <br><br>
+                Your details have been sent to the front desk.<br>
+                Please wait for confirmation.<br><br>
                 कृपया फ्रंट डेस्क से पुष्टि की प्रतीक्षा करें।
             </div>
         </div>
 
-        <div class="footer">Powered by JoyHotels</div>
+        <div class="footer">Powered by JoyHotels • Secure Check-in</div>
     </div>
 
     <script>
-        function previewPhoto(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    document.getElementById('previewImg').src = e.target.result;
-                    document.getElementById('photoPreview').style.display = 'block';
-                    document.getElementById('photoUploadArea').style.display = 'none';
-                };
-                reader.readAsDataURL(input.files[0]);
+        let memberCount = 0;
+
+        /* ── PRIMARY ID PHOTO ── */
+        function showIdPreview(input) {
+            if (!input.files || !input.files[0]) return;
+
+            // If camera input was used, copy file reference into the gallery input
+            // so FormData picks it up under name="id_photo"
+            if (input.id === 'idCameraInput') {
+                const dt = new DataTransfer();
+                dt.items.add(input.files[0]);
+                document.getElementById('idGalleryInput').files = dt.files;
             }
+
+            const reader = new FileReader();
+            reader.onload = e => {
+                document.getElementById('previewImg').src = e.target.result;
+                document.getElementById('idPreview').style.display = 'block';
+                document.getElementById('photoUploadZone').style.display = 'none';
+            };
+            reader.readAsDataURL(input.files[0]);
         }
 
-        function addMemberField() {
+        function resetIdPhoto() {
+            document.getElementById('idPreview').style.display = 'none';
+            document.getElementById('photoUploadZone').style.display = 'block';
+            document.getElementById('idGalleryInput').value = '';
+            document.getElementById('idCameraInput').value = '';
+        }
+
+        /* ── ADD MEMBER ── */
+        function addMember() {
+            memberCount++;
+            const idx = memberCount;
             const container = document.getElementById('membersContainer');
-            const index = container.children.length + 1;
-            const inputHTML = `
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                    <input type="text" class="form-input member-name" placeholder="Member ${index} Name" required>
-                    <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1.2rem;">❌</button>
+            const num = container.children.length + 1;
+
+            const card = document.createElement('div');
+            card.className = 'member-card';
+            card.id = `member-card-${idx}`;
+            card.innerHTML = `
+                <div class="member-header">
+                    <div class="member-title">👤 Member ${num} / सदस्य ${num}</div>
+                    <button type="button" class="remove-btn" onclick="removeMember(this)">✕ Remove</button>
+                </div>
+                <div class="member-grid">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Name <span class="hindi">/ नाम</span> <span class="required">*</span></label>
+                        <input type="text" class="form-input member-name" placeholder="Full Name" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Age <span class="hindi">/ आयु</span></label>
+                        <input type="number" class="form-input member-age" placeholder="Age" min="0">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Phone <span class="hindi">/ फोन</span> <span class="required">*</span></label>
+                        <input type="tel" class="form-input member-phone" placeholder="10 digit number" required pattern="[0-9]{10}">
+                    </div>
+                    <div class="member-photo-full">
+                        <label class="form-label">ID Photo <span class="hindi">/ पहचान पत्र</span> <span class="required">*</span></label>
+                        <div class="mini-upload-row">
+                            <button type="button" class="mini-upload-btn" onclick="document.getElementById('member-cam-${idx}').click()">
+                                📷 Camera
+                            </button>
+                            <button type="button" class="mini-upload-btn" onclick="document.getElementById('member-gal-${idx}').click()">
+                                🖼️ Gallery
+                            </button>
+                        </div>
+                        <input type="file" class="member-id-photo" id="member-gal-${idx}" accept="image/*" style="display:none;" onchange="showMemberPreview(this, ${idx})">
+                        <input type="file" id="member-cam-${idx}" accept="image/*" capture="environment" style="display:none;" onchange="showMemberPreview(this, ${idx})">
+                        <img class="mini-preview-img" id="member-prev-${idx}" src="" alt="Member ID">
+                    </div>
                 </div>
             `;
-            container.insertAdjacentHTML('beforeend', inputHTML);
+            container.appendChild(card);
         }
 
-        document.getElementById('checkinForm').addEventListener('submit', async function (e) {
+        function showMemberPreview(input, idx) {
+            if (!input.files || !input.files[0]) return;
+
+            // If camera, copy to gallery input so it gets submitted under member-id-photo class
+            if (input.id === `member-cam-${idx}`) {
+                const dt = new DataTransfer();
+                dt.items.add(input.files[0]);
+                document.getElementById(`member-gal-${idx}`).files = dt.files;
+            }
+
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = document.getElementById(`member-prev-${idx}`);
+                img.src = e.target.result;
+                img.style.display = 'block';
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+
+        function removeMember(btn) {
+            const card = btn.closest('.member-card');
+            card.style.transition = 'opacity 0.2s, transform 0.2s';
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(-10px)';
+            setTimeout(() => {
+                card.remove();
+                document.querySelectorAll('.member-card').forEach((c, i) => {
+                    const t = c.querySelector('.member-title');
+                    if (t) t.innerHTML = `👤 Member ${i+1} / सदस्य ${i+1}`;
+                });
+            }, 200);
+        }
+
+        /* ── VALIDATE ── */
+        function validatePhotos() {
+            const hasPrimary = document.getElementById('idGalleryInput').files.length > 0;
+            const memberCards = document.querySelectorAll('.member-card');
+
+            if (!hasPrimary) {
+                alert('Please upload your ID photo / कृपया अपना पहचान पत्र फोटो अपलोड करें');
+                return false;
+            }
+
+            if (memberCards.length >= 1) {
+                let photoCount = 1;
+                memberCards.forEach(card => {
+                    const p = card.querySelector('.member-id-photo');
+                    if (p && p.files.length > 0) photoCount++;
+                });
+                if (photoCount < 2) {
+                    document.getElementById('photoValidationError').classList.add('show');
+                    return false;
+                }
+            }
+
+            document.getElementById('photoValidationError').classList.remove('show');
+            return true;
+        }
+
+        /* ── SUBMIT ── */
+        document.getElementById('checkinForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+            if (!validatePhotos()) return;
+
+            const memberCards = document.querySelectorAll('.member-card');
+            for (const card of memberCards) {
+                const name = card.querySelector('.member-name').value.trim();
+                const phone = card.querySelector('.member-phone').value.trim();
+                if (!name || !phone) {
+                    alert('Please fill all member details / कृपया सभी सदस्य जानकारी भरें');
+                    return;
+                }
+            }
 
             const btn = document.getElementById('submitBtn');
             btn.disabled = true;
-            btn.innerHTML = '⏳ Sending... / भेजा जा रहा है...';
+            btn.innerHTML = '<span>⏳</span> Sending... / भेजा जा रहा है...';
 
             try {
-                // Gather members
-                const memberInputs = document.querySelectorAll('.member-name');
-                const membersList = Array.from(memberInputs).map(inp => inp.value.trim()).filter(val => val !== '');
-                document.getElementById('membersInput').value = JSON.stringify(membersList);
-
                 const formData = new FormData(this);
+
+                // Build members array
+                const membersData = [];
+                memberCards.forEach((card, index) => {
+                    const name = card.querySelector('.member-name').value.trim();
+                    const age = card.querySelector('.member-age')?.value.trim();
+                    const phone = card.querySelector('.member-phone').value.trim();
+                    membersData.push({ name, age, phone });
+
+                    const photoInput = card.querySelector('.member-id-photo');
+                    if (photoInput && photoInput.files[0]) {
+                        formData.append(`member_photo_${index}`, photoInput.files[0]);
+                    }
+                });
+
+                formData.append('members', JSON.stringify(membersData));
+                formData.append('member_count', memberCards.length);
 
                 const resp = await fetch('/api/guest/self-checkin', {
                     method: 'POST',
@@ -393,12 +840,12 @@
                 } else {
                     alert(result.message || 'Error submitting / जमा करने में त्रुटि');
                     btn.disabled = false;
-                    btn.innerHTML = '✅ Submit / जमा करें';
+                    btn.innerHTML = '<span>✅</span> Submit Check-in / जमा करें';
                 }
             } catch (err) {
                 alert('Connection error / कनेक्शन त्रुटि');
                 btn.disabled = false;
-                btn.innerHTML = '✅ Submit / जमा करें';
+                btn.innerHTML = '<span>✅</span> Submit Check-in / जमा करें';
             }
         });
     </script>

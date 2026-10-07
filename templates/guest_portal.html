@@ -90,22 +90,26 @@
 
 <body>
     <div class="container">
-        <div class="header">
-            <div style="font-size: 2rem;">🛎️</div>
-            <h1>Guest Portal</h1>
-            <p class="welcome">Welcome, {{ booking.guest_name }}</p>
-            <div class="room-badge">Room {{ booking.room }}</div>
-        </div>
-
-        <div class="card">
-            <h2>⚡ Quick Requests</h2>
-            <div class="grid">
-                <button class="btn btn-outline" onclick="requestService('cleaning')">🧹 Clean Room</button>
-                <button class="btn btn-outline" onclick="requestService('water')">💧 Water</button>
-                <button class="btn btn-outline" onclick="requestService('towels')">🧴 Towels</button>
-                <button class="btn btn-outline" onclick="requestService('dnd')">⛔ Do Not Disturb</button>
+        <!-- Main View -->
+        <div id="mainView">
+            <div class="header">
+                <div style="font-size: 2rem;">🛎️</div>
+                <h1>Guest Portal</h1>
+                <p class="welcome">Welcome, {{ booking.guest_name }}</p>
+                <div class="room-badge">Room {{ booking.room }}</div>
+                <button class="btn" onclick="toggleEditView()" style="margin-top: 1rem;">✏️ Edit Details</button>
             </div>
-        </div>
+
+            <div class="card">
+                <h2>⚡ Quick Requests</h2>
+                <div class="grid">
+                    <button class="btn btn-outline" onclick="requestService('cleaning')">🧹 Clean Room</button>
+                    <button class="btn btn-outline" onclick="requestService('water')">💧 Water</button>
+                    <button class="btn btn-outline" onclick="requestService('towels')">🧴 Towels</button>
+                    <button class="btn btn-outline" onclick="requestService('dnd')">⛔ Do Not Disturb</button>
+                </div>
+            </div>
+        
 
         <div class="card">
             <h2>🧾 Your Bill (Estimated)</h2>
@@ -119,10 +123,125 @@
             <h2>📞 Front Desk</h2>
             <button class="btn" onclick="window.location.href='tel:911'">Call Reception</button>
         </div>
+        </div>
+
+        <!-- Edit View -->
+        <div id="editView" style="display: none;">
+            <div class="header">
+                <div style="font-size: 2rem;">✏️</div>
+                <h1>Edit Your Details</h1>
+                <button class="btn" onclick="toggleEditView()" style="margin-top: 1rem; background: #94a3b8;">← Back</button>
+            </div>
+
+            <form id="editForm" enctype="multipart/form-data">
+                <!-- Guest Name -->
+                <div class="card">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Guest Name</label>
+                    <input type="text" id="guestName" placeholder="Full Name" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #0f172a; color: #f8fafc; margin-bottom: 1rem; box-sizing: border-box;">
+                    
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Second Guest Name (Optional)</label>
+                    <input type="text" id="secondGuestName" placeholder="Second Guest Name" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #0f172a; color: #f8fafc; margin-bottom: 1rem; box-sizing: border-box;">
+                </div>
+
+                <!-- Phone & Address -->
+                <div class="card">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Phone Number</label>
+                    <input type="tel" id="phone" placeholder="Phone Number" pattern="[0-9]{10}" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #0f172a; color: #f8fafc; margin-bottom: 1rem; box-sizing: border-box;">
+                    
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Address</label>
+                    <input type="text" id="address" placeholder="Address" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #0f172a; color: #f8fafc; margin-bottom: 1rem; box-sizing: border-box;">
+                </div>
+
+                <!-- ID Details -->
+                <div class="card">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">ID Number</label>
+                    <input type="text" id="idNumber" placeholder="ID Number" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #0f172a; color: #f8fafc; margin-bottom: 1rem; box-sizing: border-box;">
+                    
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">ID Photo</label>
+                    <input type="file" id="idPhoto" accept="image/*" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #0f172a; color: #f8fafc; margin-bottom: 1rem; box-sizing: border-box;">
+                </div>
+
+                <!-- Room Number -->
+                <div class="card">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Room Number</label>
+                    <input type="text" id="roomNumber" placeholder="Room Number" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #0f172a; color: #f8fafc; margin-bottom: 1rem; box-sizing: border-box;">
+                </div>
+
+                <!-- Submit -->
+                <div class="card">
+                    <button type="submit" class="btn" style="background: #10b981;">💾 Save Changes</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script>
         const bookingId = {{ booking.id }};
+
+        // Toggle between main view and edit view
+        function toggleEditView() {
+            const mainView = document.getElementById('mainView');
+            const editView = document.getElementById('editView');
+            mainView.style.display = mainView.style.display === 'none' ? 'block' : 'none';
+            editView.style.display = editView.style.display === 'none' ? 'block' : 'none';
+            
+            if (editView.style.display === 'block') {
+                loadCurrentDetails();
+            }
+        }
+
+        // Load current booking details into the edit form
+        async function loadCurrentDetails() {
+            try {
+                const res = await fetch(`/api/guest/edit-details/${bookingId}`);
+                const data = await res.json();
+                
+                document.getElementById('guestName').value = data.guest_name || '';
+                document.getElementById('secondGuestName').value = data.second_guest_name || '';
+                document.getElementById('phone').value = data.phone || '';
+                document.getElementById('address').value = data.address || '';
+                document.getElementById('idNumber').value = data.id_number || '';
+                document.getElementById('roomNumber').value = data.room || '';
+            } catch (e) {
+                console.error('Error loading details:', e);
+            }
+        }
+
+        // Handle form submission for edit
+        document.getElementById('editForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('booking_id', bookingId);
+            formData.append('guest_name', document.getElementById('guestName').value);
+            formData.append('second_guest_name', document.getElementById('secondGuestName').value);
+            formData.append('phone', document.getElementById('phone').value);
+            formData.append('address', document.getElementById('address').value);
+            formData.append('id_number', document.getElementById('idNumber').value);
+            formData.append('room', document.getElementById('roomNumber').value);
+            
+            const idPhotoFile = document.getElementById('idPhoto').files[0];
+            if (idPhotoFile) {
+                formData.append('id_photo', idPhotoFile);
+            }
+            
+            try {
+                const res = await fetch('/api/guest/update-details', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    alert('Details updated successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.message || 'Failed to update'));
+                }
+            } catch (e) {
+                alert('Error updating details: ' + e.message);
+            }
+        });
 
         async function requestService(type) {
             if (!confirm(`Request ${type}?`)) return;
@@ -140,11 +259,6 @@
                 alert('Connection error');
             }
         }
-
-        // Fetch Bill Total (Simulate for now or reuse bill logic)
-        // Ideally we'd have an API for bill total, but let's just show "Click to View" for now
-        // or fetch bill page and parse? No, too complex.
-        // Let's just create a quick API for bill total if needed, or leave as "..."
     </script>
 </body>
 

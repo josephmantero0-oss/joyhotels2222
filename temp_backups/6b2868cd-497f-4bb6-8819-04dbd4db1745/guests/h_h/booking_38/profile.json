@@ -1,0 +1,11 @@
+{
+  "name": "h",
+  "phone": "h",
+  "address": "h",
+  "members": null,
+  "checkin": "2026-01-12 19:45:00",
+  "checkout": "2026-01-12 20:02:00",
+  "amount": 3.0,
+  "status": "completed",
+  "rooms": null
+}

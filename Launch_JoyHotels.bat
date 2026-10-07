@@ -1,35 +1,39 @@
 @echo off
-TITLE JoyHotels Launcher
+TITLE JoyHotels System Launcher
 cd /d "%~dp0"
 
 echo ==========================================
 echo    JOYHOTELS SYSTEM IS STARTING...
 echo ==========================================
 
-if not exist .venv\Scripts\activate.bat goto ERR_VENV
+if not exist .venv\Scripts\python.exe (
+    echo [ERROR] Virtual environment (.venv) not found.
+    pause
+    exit /b 1
+)
 
-echo [1/2] Activating environment...
-call .venv\Scripts\activate.bat
+:: Check if port 5000 is already active
+netstat -ano | findstr /R /C:":5000 .*LISTENING" >nul 2>&1
+if %ERRORLEVEL%==0 (
+    echo Server is already running. Opening browser...
+    start "" "http://localhost:5000"
+    timeout /t 2 >nul
+    exit /b 0
+)
 
-echo [2/2] Starting server...
-:: Open browser
-start "" "http://localhost:5000"
+echo [1/2] Launching JoyHotels App Server...
+start "" powershell -Command "$null = Start-Sleep -Milliseconds 1500; Start-Process 'http://localhost:5000'"
 
-echo.
-echo System is running! Keep this window open.
+echo [2/2] Keeping server active...
+echo System is running at http://localhost:5000 (Keep this window open)
 echo ------------------------------------------
-python app.py
-if %ERRORLEVEL% neq 0 goto ERR_RUN
-exit /b
+.venv\Scripts\python.exe app.py
 
-:ERR_VENV
-echo [ERROR] Virtual environment (.venv) not found.
-echo Please follow the SETUP_GUIDE.md.
-pause
-exit /b
+if %ERRORLEVEL% neq 0 (
+    echo.
+    echo [ERROR] The system stopped or crashed.
+    pause
+    exit /b 1
+)
 
-:ERR_RUN
-echo.
-echo [ERROR] The system stopped or crashed.
-pause
-exit /b
+

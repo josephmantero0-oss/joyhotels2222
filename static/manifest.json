@@ -3,7 +3,7 @@
   "short_name": "JoyHotels",
   "description": "JoyHotels Management System",
   "start_url": "/",
-  "display": "standalone",
+  "display": "browser",
   "background_color": "#f8fafc",
   "theme_color": "#10b981",
   "orientation": "any",

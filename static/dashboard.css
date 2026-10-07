@@ -1,8 +1,8 @@
 :root {
     /* Brand Colors */
-    --primary-color: #FFD700;
-    /* Default Yellow, overridden by JS */
-    --primary-hover: #e6c200;
+    --primary-color: #a855f7;
+    /* Default Light Purple, overridden by JS if user saved a custom color */
+    --primary-hover: #9333ea;
 
     /* Dark Mode (Default) */
     --bg-body: #0f172a;
@@ -586,7 +586,9 @@ tr:hover td {
     padding: 2.5rem;
     border-radius: var(--radius-xl);
     width: 90%;
-    max-width: 500px;
+    max-width: 540px;
+    max-height: 90vh;
+    overflow-y: auto;
     border: 1px solid var(--border-color);
     box-shadow: var(--shadow-lg);
     animation: modalSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1);

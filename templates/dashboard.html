@@ -41,14 +41,34 @@
         }
     </style>
     <script>
-        // Apply saved theme immediately
-        const savedColor = localStorage.getItem('joy_theme_{{ session.hotel_id }}');
-        if (savedColor) {
+        // ---- Apply saved primary colour immediately (before CSS loads) ----
+        (function() {
+            const PURPLE = '#a855f7';
+            const hotelId = '{{ session.hotel_id }}';
+
+            // Migration: old key stored 'dark'/'light' — rescue it and clear the bad colour value
+            const oldVal = localStorage.getItem('joy_theme_' + hotelId);
+            if (oldVal === 'dark' || oldVal === 'light') {
+                localStorage.setItem('joy_darkmode_' + hotelId, oldVal);
+                localStorage.removeItem('joy_theme_' + hotelId);
+            } else if (oldVal) {
+                // old key had a real hex colour — migrate it to new key
+                if (!localStorage.getItem('joy_color_' + hotelId)) {
+                    localStorage.setItem('joy_color_' + hotelId, oldVal);
+                }
+                localStorage.removeItem('joy_theme_' + hotelId);
+            }
+
+            const savedColor = localStorage.getItem('joy_color_' + hotelId) || PURPLE;
             document.documentElement.style.setProperty('--primary-color', savedColor);
-            // Helper to darken color for hover
-            const adjustColor = (color, amount) => '#' + color.replace(/^#/, '').replace(/../g, color => ('0' + Math.min(255, Math.max(0, parseInt(color, 16) + amount)).toString(16)).substr(-2));
-            document.documentElement.style.setProperty('--primary-hover', adjustColor(savedColor, -20));
-        }
+            const adj = (hex, amt) => '#' + hex.replace(/^#/, '').replace(/../g, c =>
+                ('0' + Math.min(255, Math.max(0, parseInt(c, 16) + amt)).toString(16)).slice(-2));
+            document.documentElement.style.setProperty('--primary-hover', adj(savedColor, -20));
+            // Persist so it survives every refresh without user needing to click Save
+            if (!localStorage.getItem('joy_color_' + hotelId)) {
+                localStorage.setItem('joy_color_' + hotelId, PURPLE);
+            }
+        })();
     </script>
     <style>
         /* Financial Dashboard Specific Styles */
@@ -376,6 +396,15 @@
 </head>
 
 <body>
+    <!-- ERROR DISPLAY -->
+    <div id="debug-error-display" style="position:fixed; top:0; left:0; width:100%; background:red; color:white; z-index:999999; padding:10px; display:none; font-family:monospace; white-space:pre-wrap;"></div>
+    <script>
+        window.addEventListener('error', function(e) {
+            const el = document.getElementById('debug-error-display');
+            el.style.display = 'block';
+            el.innerHTML += e.message + ' at ' + e.filename + ':' + e.lineno + '<br>';
+        });
+    </script>
     <!-- Sidebar overlay for mobile -->
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
@@ -390,6 +419,16 @@
 
             <!-- Navigation Items -->
             <div class="sidebar-nav">
+                <!-- Refresh Button -->
+                <button id="sidebarRefreshBtn" onclick="sidebarRefresh()" title="Refresh Page"
+                    style="width:100%; display:flex; align-items:center; justify-content:center; gap:0.5rem;
+                           background: rgba(168,85,247,0.13); border: 1px solid rgba(168,85,247,0.4);
+                           color: var(--primary-color); border-radius:10px; padding:0.55rem 1rem;
+                           font-size:0.85rem; font-weight:600; cursor:pointer; margin-bottom:0.5rem;
+                           transition: all 0.2s ease;">
+                    <span id="refreshIcon" style="font-size:1.1rem; display:inline-block;">↻</span>
+                    Refresh
+                </button>
                 <span class="sidebar-section-label">Main</span>
                 <button class="sidebar-nav-item active" id="nav-dashboard" onclick="showPage('dashboard', this)">
                     <span class="nav-icon">🏠</span> Dashboard
@@ -700,11 +739,40 @@
                 <h1>Guest History <span class="info-btn" onclick="openStaffHelp('guests')">i</span></h1>
             </div>
             <div class="content-card">
-                <div class="search-inputs" style="margin-bottom: 1.5rem;">
+                <!-- Search Bar Row -->
+                <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center; margin-bottom:1rem;">
+                    <!-- Text search -->
                     <input type="text" id="guestSearchInput" class="form-control"
-                        placeholder="Search by Name, Phone, or Room Number" onkeyup="filterGuests()">
-                    <button class="btn btn-primary" onclick="filterGuests()">Search</button>
+                        placeholder="Search by Name, Phone or Room" onkeyup="filterGuestsLocal()"
+                        style="flex:2; min-width:180px;">
+
+                    <!-- Filter type -->
+                    <select id="guestDateFilter" class="form-control" style="flex:1; min-width:130px;"
+                        onchange="onGuestFilterChange()">
+                        <option value="all">All Time</option>
+                        <option value="date">By Date</option>
+                        <option value="month">By Month</option>
+                    </select>
+
+                    <!-- Date picker (shown when filter = date) -->
+                    <input type="date" id="guestDatePicker" class="form-control"
+                        style="flex:1; min-width:150px; display:none;">
+
+                    <!-- Month picker (shown when filter = month) -->
+                    <input type="month" id="guestMonthPicker" class="form-control"
+                        style="flex:1; min-width:150px; display:none;">
+
+                    <button class="btn btn-primary" onclick="runGuestSearch()" style="white-space:nowrap;">
+                        🔍 Search
+                    </button>
+                    <button class="btn btn-outline" onclick="clearGuestSearch()" style="white-space:nowrap;">
+                        ✕ Clear
+                    </button>
                 </div>
+
+                <!-- Results count -->
+                <div id="guestResultCount" style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:0.75rem;"></div>
+
                 <div class="table-responsive">
                     <table id="guestsTable">
                         <thead>
@@ -723,6 +791,7 @@
             </div>
         </div>
 
+
         <!-- Calendar Page -->
         <div id="calendar-page" class="page">
             <div class="page-header">
@@ -738,6 +807,32 @@
             <div class="page-header">
                 <h1>Expenses <span class="info-btn" onclick="openStaffHelp('expenses')">i</span></h1>
             </div>
+
+            <!-- Financial Summary Cards -->
+            <div class="financial-grid-cards" style="margin-bottom: 1.5rem;">
+                <div class="fin-card">
+                    <div class="fin-icon expense-bg" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">💸</div>
+                    <div class="fin-info">
+                        <label style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Total Expenses (All Time)</label>
+                        <h2 id="expenseTotalAllTime" style="font-size: 1.6rem; font-weight: 800; color: #ef4444; margin: 0.25rem 0 0 0;">₹0</h2>
+                    </div>
+                </div>
+                <div class="fin-card">
+                    <div class="fin-icon profit-bg" style="background: rgba(212, 175, 55, 0.1); color: #ffd700;">📅</div>
+                    <div class="fin-info">
+                        <label style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Daily Expense (Today)</label>
+                        <h2 id="expenseTotalToday" style="font-size: 1.6rem; font-weight: 800; color: #ffd700; margin: 0.25rem 0 0 0;">₹0</h2>
+                    </div>
+                </div>
+                <div class="fin-card">
+                    <div class="fin-icon revenue-bg" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">📊</div>
+                    <div class="fin-info">
+                        <label id="expenseFilteredLabel" style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Filtered Expenses Total</label>
+                        <h2 id="expenseTotalFiltered" style="font-size: 1.6rem; font-weight: 800; color: #10b981; margin: 0.25rem 0 0 0;">₹0</h2>
+                    </div>
+                </div>
+            </div>
+
             <div class="content-card">
                 <h3>Add Expense</h3>
                 <div style="display:flex; gap:1rem; flex-wrap: wrap;">
@@ -752,6 +847,7 @@
                         <option value="Utility">Utility</option>
                         <option value="Marketing">Marketing</option>
                     </select>
+                    <input id="expenseDate" type="date" class="form-control" style="flex: 1;">
                     <button class="btn btn-success" onclick="addExpense()">Add Expense</button>
                 </div>
             </div>
@@ -896,11 +992,11 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; margin-top: 1rem;">
                     <div class="form-group">
                         <label style="font-weight: 600; margin-bottom: 0.3rem; display: block;">Check-in / आगमन</label>
-                        <input type="datetime-local" id="acceptCheckinTime" class="form-control" style="width: 100%; padding: 0.7rem;">
+                        <input type="text" id="acceptCheckinTime" class="form-control" placeholder="DD-MM-YYYY hh:mm AM/PM" autocomplete="off" style="width: 100%; padding: 0.7rem;">
                     </div>
                     <div class="form-group">
                         <label style="font-weight: 600; margin-bottom: 0.3rem; display: block;">Check-out / प्रस्थान</label>
-                        <input type="datetime-local" id="acceptCheckoutTime" class="form-control" style="width: 100%; padding: 0.7rem;">
+                        <input type="text" id="acceptCheckoutTime" class="form-control" placeholder="DD-MM-YYYY hh:mm AM/PM" autocomplete="off" style="width: 100%; padding: 0.7rem;">
                     </div>
                 </div>
                 <button class="btn btn-primary" onclick="confirmAcceptCheckin()" 
@@ -923,32 +1019,26 @@
             </div>
 
             <div class="financial-cards">
-                <div class="financial-card" style="border-left: 4px solid var(--info-color); margin-bottom: 1.5rem;">
-                    <h3 style="color: var(--text-primary);">Backup Data</h3>
+                                <div class="financial-card" style="border-left: 4px solid var(--info-color); margin-bottom: 1.5rem;">
+                    <h3 style="color: var(--text-primary);">&#128190; Export Guest Data</h3>
                     <p style="font-size: 0.9rem; color: var(--text-secondary); margin: 10px 0;">
-                        Download a full backup of your database and guest photos.<br>
-                        <strong>Instructions:</strong><br>
-                        1. Download this file every 2-3 months.<br>
-                        2. Rename it with the date (e.g. <code>backup_oct_2025.zip</code>).<br>
-                        3. Save it securely on your computer.
+                        Download a complete, nicely sorted backup of all guest history.<br>
+                        <strong>Formats included:</strong> PDF, Excel (.xlsx), and Word (.docx).<br>
+                        <em>Includes a dedicated <strong>Guest_Photos_Only.pdf</strong> with large ID photos.</em>
                     </p>
-                    <button class="btn btn-primary" onclick="window.location.href='/api/backup'">
-                        ⬇️ Download Backup (Zip)
+                    <button class="btn btn-primary" onclick="window.location.href='/api/backup/export_all'" style="font-size: 1.05rem; padding: 0.8rem 1.5rem;">
+                        &#128142; Download Backup Data (ZIP)
                     </button>
                 </div>
 
-                <div class="financial-card" style="border-left: 4px solid var(--danger-color);">
-                    <h3 style="color: var(--text-primary);">Restore Data</h3>
+                <div class="financial-card" style="border-left: 4px solid var(--success-color);">
+                    <h3 style="color: var(--text-primary);">📂 Restore from Backup</h3>
                     <p style="font-size: 0.9rem; color: var(--text-secondary); margin: 10px 0;">
-                        Upload a backup zip file to restore your system. <br>
-                        <strong style="color: var(--danger-color);">⚠️ WARNING: This will DELETE all current
-                            data!</strong><br>
-                        All current guests, history, and rooms will be VANISHED and replaced with the backup.
-                        Please ensure you have backed up your CURRENT data before restoring an old one.
+                        Upload a backup ZIP file to preview its contents. This will <strong style="color: var(--primary-color);">NOT</strong> replace your current data — it's view-only.
                     </p>
                     <div style="display: flex; gap: 10px; margin-top: 10px;">
                         <input type="file" id="backupFile" class="form-control" accept=".zip">
-                        <button class="btn btn-danger" onclick="restoreSystem()">Restore System</button>
+                        <button class="btn btn-primary" onclick="viewBackup()">Open Backup</button>
                     </div>
                 </div>
             </div>
@@ -969,20 +1059,23 @@
                 <div class="form-group">
                     <label>Additional Rooms (Group Booking)</label>
                     <div id="additionalRoomsSection"
-                        style="display: flex; flex-wrap: wrap; gap: 10px; max-height: 80px; overflow-y: auto;">
+                        style="display: flex; flex-wrap: wrap; gap: 8px; max-height: 110px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px; border: 1px solid var(--border-color);">
                         <!-- Checkboxes loaded dynamically -->
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div style="display: grid; grid-template-columns: 1.5fr 0.5fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label>Guest Name</label>
-                        <input type="text" id="guestName" name="guest_name" class="form-control" required>
+                        <input type="text" id="guestName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Age</label>
+                        <input type="number" id="guestAge" class="form-control" min="0" required>
                     </div>
                     <div class="form-group">
                         <label>Phone Number</label>
-                        <input type="tel" id="guestPhone" name="phone" class="form-control" required
-                            onblur="searchGuest()">
+                        <input type="tel" id="guestPhone" name="phone" class="form-control" required>
                     </div>
                 </div>
 
@@ -992,10 +1085,12 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Additional Members <span style="font-size: 0.8rem; color: #94a3b8;">(Optional)</span></label>
-                    <div id="dashboardMembersContainer"></div>
-                    <button type="button" class="btn btn-outline" onclick="addDashboardMemberField()" style="margin-top: 0.5rem; padding: 0.2rem 0.5rem; font-size: 0.8rem;">
-                        + Add Member
+                    <label style="font-weight: 600;">Additional Members <span style="font-size: 0.8rem; color: #94a3b8;">(Optional)</span></label>
+                    <div id="dashboardMembersContainer" style="margin-bottom: 0.5rem;"></div>
+                    <button type="button" onclick="addDashboardMemberField()"
+                        style="width: 100%; padding: 0.85rem; background: rgba(212, 175, 55, 0.08); border: 2px dashed rgba(212, 175, 55, 0.4); border-radius: 12px; color: #ffd700; font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 8px;"
+                        onmouseover="this.style.background='rgba(212, 175, 55, 0.16)';" onmouseout="this.style.background='rgba(212, 175, 55, 0.08)';">
+                        ✨ + Add Additional Member
                     </button>
                     <input type="hidden" name="members" id="dashboardMembersInput" value="[]">
                 </div>
@@ -1003,22 +1098,40 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label>ID Number</label>
-                        <input type="text" id="guestId" name="id_number" class="form-control" required>
+                        <input type="text" id="guestId" name="id_number" class="form-control" required placeholder="Aadhaar / DL / PAN">
                     </div>
                     <div class="form-group">
                         <label>Room Amount (₹)</label>
-                        <input type="number" id="roomAmount" name="amount" class="form-control" required>
+                        <input type="number" id="roomAmount" name="amount" class="form-control" required placeholder="1500">
                     </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
-                        <label>ID Photos</label>
-                        <input type="file" id="idPhoto" name="id_photos" class="form-control" accept="image/*" multiple
-                            style="padding: 4px;">
+                        <label>ID Photos <span style="font-size: 0.75rem; color: #d4af37;">(compulsory)</span></label>
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            <button type="button" onclick="document.getElementById('idPhoto').click()"
+                                style="flex: 1; padding: 0.65rem; background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(16, 185, 129, 0.2)); border: 1.5px solid rgba(212, 175, 55, 0.4); border-radius: 10px; color: #ffffff; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                🖼️ <span id="fileButtonText">Choose ID</span>
+                            </button>
+                            <button type="button" onclick="document.getElementById('idCameraPhoto').click()"
+                                style="padding: 0.65rem 0.85rem; background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 10px; color: white; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                                📷 Snap Camera
+                            </button>
+                            <button type="button" onclick="scanIDWithAI()" id="aiScanBtn"
+                                style="padding: 0.65rem 0.85rem; background: linear-gradient(135deg, #6366f1, #a855f7); border: none; border-radius: 10px; color: white; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);">
+                                🤖 Auto-Scan
+                            </button>
+                            
+                            <input type="file" id="idPhoto" accept="image/*,.pdf" multiple style="display: none;"
+                                onchange="handleIdPhotoSelection(this)">
+                            <input type="file" id="idCameraPhoto" accept="image/*" capture="environment" style="display: none;"
+                                onchange="handleIdPhotoSelection(this)">
+                        </div>
+                        <div id="photoPreviewGrid" style="display: none;"></div>
                     </div>
                     <div class="form-group">
-                        <label>Check-in Time</label>
+                        <label>Check-in Date & Time</label>
                         <input type="datetime-local" id="checkinTime" name="checkin_time" class="form-control" required>
                     </div>
                 </div>
@@ -1043,7 +1156,7 @@
                 <input type="hidden" id="checkoutBookingId">
                 <div class="form-group">
                     <label>Checkout Time</label>
-                    <input type="datetime-local" id="checkoutTime" class="form-control" required>
+                    <input type="text" id="checkoutTime" class="form-control" placeholder="DD-MM-YYYY hh:mm AM/PM" autocomplete="off" required>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
@@ -1414,9 +1527,10 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Restore theme
-            const savedTheme = localStorage.getItem('joy_theme_{{ session.hotel_id }}');
-            if (savedTheme) applyTheme(savedTheme);
+            // Restore dark/light mode (separate key from colour)
+            const savedMode = localStorage.getItem('joy_darkmode_{{ session.hotel_id }}');
+            if (savedMode) applyTheme(savedMode);
+            // else default (dark) already set by CSS data-theme attribute
 
             // Check Announce
             checkAnnouncements();
@@ -1446,7 +1560,13 @@
             else if (pageId === 'financial') updateFinancials();
             else if (pageId === 'guests') loadGuests();
             else if (pageId === 'calendar-page') loadCalendar();
-            else if (pageId === 'expenses') loadExpenses();
+            else if (pageId === 'expenses') {
+                loadExpenses();
+                const expDateInput = document.getElementById('expenseDate');
+                if (expDateInput && !expDateInput.value) {
+                    expDateInput.value = new Date().toISOString().split('T')[0];
+                }
+            }
             else if (pageId === 'reports-page') loadReports();
             else if (pageId === 'system') { /* No specific load function needed for system page */ }
         }
@@ -1462,7 +1582,7 @@
             const currentTheme = document.body.getAttribute('data-theme') || 'dark';
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             applyTheme(newTheme);
-            localStorage.setItem('joy_theme_{{ session.hotel_id }}', newTheme);
+            localStorage.setItem('joy_darkmode_{{ session.hotel_id }}', newTheme);
         }
 
         // --- Export & Printing ---
@@ -1484,6 +1604,17 @@
             };
             html2pdf().set(opt).from(element).save();
         }
+
+        function setBackupSummaryDate() {
+            const dateElement = document.getElementById('backupDateExport');
+            if (dateElement) {
+                dateElement.textContent = new Date().toLocaleDateString();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setBackupSummaryDate();
+        });
 
         // --- Room Management ---
         async function loadRooms() {
@@ -1640,6 +1771,29 @@
         }
 
         // --- Booking Flow ---
+        function formatAmPmDateTime(localISO) {
+            if (!localISO) return '';
+            const parts = localISO.split('T');
+            const dateParts = parts[0].split('-');
+            const timeParts = (parts[1] || '00:00').split(':');
+            let hour = parseInt(timeParts[0], 10);
+            const minute = timeParts[1] || '00';
+            const period = hour >= 12 ? 'PM' : 'AM';
+            hour = hour % 12 || 12;
+            return `${dateParts[2]}-${dateParts[1]}-${dateParts[0]} ${String(hour).padStart(2, '0')}:${minute} ${period}`;
+        }
+
+        function parseAmPmDateTime(value) {
+            const match = value.trim().match(/^(\d{1,2})-(\d{1,2})-(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+            if (!match) return value;
+            let hour = parseInt(match[4], 10);
+            const period = match[6].toUpperCase();
+            if (hour < 1 || hour > 12 || parseInt(match[5], 10) > 59) return value;
+            if (period === 'PM' && hour !== 12) hour += 12;
+            if (period === 'AM' && hour === 12) hour = 0;
+            return `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}T${String(hour).padStart(2, '0')}:${match[5]}`;
+        }
+
         function openBookingModal(room) {
             window.targetRoom = room; // Store target room globally for form submission
             // Only reset if NOT coming from the reservation flow
@@ -1651,61 +1805,144 @@
             document.getElementById('guestStatusBadge').textContent = '';
             document.getElementById('guestStatusBadge').style.backgroundColor = 'transparent';
 
-            // Populate Additional Rooms
-            const container = document.getElementById('additionalRoomsSection');
-            container.innerHTML = '';
-
-            allRooms.forEach(r => {
-                // Only show available rooms that are not the current room
-                if (r.status === 'available' && r.room_id !== room.room_id) {
-                    const div = document.createElement('div');
-                    div.innerHTML = `
-                        <input type="checkbox" name="additional_rooms" value="${r.room_id}" id="room_${r.room_id}">
-                        <label for="room_${r.room_id}">${r.room_id}</label>
-                    `;
-                    container.appendChild(div);
-                }
-            });
-
+            // Pre-fill check-in datetime-local with current time
             const now = new Date();
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-            document.getElementById('checkinTime').value = now.toISOString().slice(0, 16);
+            const checkinInput = document.getElementById('checkinTime');
+            if (checkinInput) checkinInput.value = formatAmPmDateTime(now.toISOString().slice(0, 16));
+
+            // Clear and add one additional member field by default (so 2 guest name fields are already visible)
+            const membersContainer = document.getElementById('dashboardMembersContainer');
+            if (membersContainer) {
+                membersContainer.innerHTML = '';
+                addDashboardMemberField();
+            }
+
+            // Populate Additional Rooms
+            const container = document.getElementById('additionalRoomsSection');
+            if (container) {
+                container.innerHTML = '';
+                allRooms.forEach(r => {
+                    // Only show available rooms that are not the current room
+                    if (r.status === 'available' && r.room_id !== room.room_id) {
+                        const div = document.createElement('div');
+                        div.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem;';
+                        div.innerHTML = `
+                            <input type="checkbox" name="additional_rooms" value="${r.room_id}" id="room_${r.room_id}">
+                            <label for="room_${r.room_id}" style="margin: 0; cursor: pointer;">${r.room_id}</label>
+                        `;
+                        container.appendChild(div);
+                    }
+                });
+            }
+
             document.getElementById('bookingModal').classList.add('show');
         }
 
-        async function searchGuest() {
-            const phone = document.getElementById('guestPhone').value;
-            if (phone.length < 3) return;
+
+
+        async function scanIDWithAI() {
+            const fileInput = document.getElementById('idPhoto');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showAlert('Photo Required', 'Please select or take an ID photo first! / पहले पहचान पत्र का फोटो चुनें या खींचें।', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('aiScanBtn');
+            const origText = btn.innerHTML;
+            btn.innerHTML = '⚡ Scanning...';
+            btn.disabled = true;
 
             try {
-                const response = await fetch(`/api/guests/search?phone=${phone}`);
-                const guest = await response.json();
+                // Dynamic Tesseract loader if not loaded
+                if (typeof Tesseract === 'undefined') {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                }
 
-                if (guest) {
-                    document.getElementById('guestName').value = guest.name;
-                    document.getElementById('guestAddress').value = guest.address;
-                    document.getElementById('guestId').value = guest.id_number;
+                const file = fileInput.files[0];
+                const result = await Tesseract.recognize(file, 'eng', {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            btn.innerHTML = `⚡ ${Math.round(m.progress * 100)}%`;
+                        }
+                    }
+                });
 
-                    const badge = document.getElementById('guestStatusBadge');
-                    badge.textContent = guest.status.toUpperCase();
-                    if (guest.status === 'vip') {
-                        badge.style.backgroundColor = '#fcd34d'; // Yellow
-                        badge.style.color = '#78350f';
-                    } else {
-                        badge.style.backgroundColor = '#e5e7eb'; // Grey
-                        badge.style.color = '#374151';
+                const text = result.data.text || '';
+                console.log('AI Extracted Text:', text);
+
+                // Regular expressions for Indian ID cards (Aadhaar, Driving License, Voter ID, PAN)
+                const aadhaarMatch = text.match(/\b[2-9]\d{3}\s?\d{4}\s?\d{4}\b/);
+                const dlMatch = text.match(/\b[A-Z]{2}\s?\d{2}\s?\d{11}\b/i) || text.match(/\b[A-Z]{2}-\d{13}\b/i);
+                const panMatch = text.match(/\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b/i);
+                const voterMatch = text.match(/\b[A-Z]{3}\d{7}\b/i);
+
+                let detectedID = '';
+                if (aadhaarMatch) detectedID = aadhaarMatch[0].replace(/\s/g, '');
+                else if (dlMatch) detectedID = dlMatch[0];
+                else if (panMatch) detectedID = panMatch[0];
+                else if (voterMatch) detectedID = voterMatch[0];
+
+                if (detectedID) {
+                    document.getElementById('guestId').value = detectedID;
+                }
+
+                // Extract lines for Name detection
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
+                let foundName = '';
+                let foundAddress = '';
+
+                // Common keywords to ignore
+                const ignoreKeywords = ['GOVERNMENT', 'INDIA', 'INCOME', 'TAX', 'DEPARTMENT', 'ELECTION', 'COMMISSION', 'CARD', 'MALE', 'FEMALE', 'DOB', 'DATE', 'BIRTH', 'ADDRESS', 'DRIVING', 'LICENCE', 'SIGNATURE', 'NUMBER'];
+
+                for (let line of lines) {
+                    const upper = line.toUpperCase();
+                    if (!ignoreKeywords.some(kw => upper.includes(kw)) && /^[A-Za-z\s.]{3,30}$/.test(line)) {
+                        if (!foundName) {
+                            foundName = line;
+                        }
+                    }
+                    if (upper.includes('ADDRESS') || upper.includes('HNO') || upper.includes('STREET') || upper.includes('VILL') || upper.includes('POST') || upper.includes('DIST')) {
+                        foundAddress += ' ' + line;
                     }
                 }
-            } catch (error) { console.error('Error searching guest:', error); }
+
+                if (foundName) document.getElementById('guestName').value = foundName;
+                if (foundAddress) document.getElementById('guestAddress').value = foundAddress.replace(/address\s*[:|-]?/i, '').trim();
+
+                btn.innerHTML = '✅ Scanned!';
+                btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                setTimeout(() => {
+                    btn.innerHTML = origText;
+                    btn.style.background = '';
+                    btn.disabled = false;
+                }, 2000);
+
+                showAlert('AI Scan Complete! ✨', `Scanned ID successfully!\nName: ${foundName || 'Manual check required'}\nID No: ${detectedID || 'Manual check required'}`, 'success');
+
+            } catch (err) {
+                console.error('AI Scan Error:', err);
+                btn.innerHTML = origText;
+                btn.disabled = false;
+                showAlert('Scan Notice', 'Text scanned. Please verify extracted details.', 'info');
+            }
         }
 
-        function addDashboardMemberField() {
+        function addDashboardMemberField(name = '', age = '') {
             const container = document.getElementById('dashboardMembersContainer');
+            if (!container) return;
             const index = container.children.length + 1;
             const inputHTML = `
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                    <input type="text" class="form-control dashboard-member-name" placeholder="Member ${index} Name" required>
-                    <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1.2rem;">❌</button>
+                <div class="member-input-row" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+                    <input type="text" class="form-control dashboard-member-name" placeholder="Member ${index} Name" value="${name}" style="flex: 2;">
+                    <input type="number" class="form-control dashboard-member-age" placeholder="Age" min="0" value="${age}" style="width: 80px; flex: 0 0 80px;">
+                    <button type="button" onclick="this.parentElement.remove()" style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); border-radius: 8px; color: #ef4444; cursor: pointer; padding: 6px 10px; font-size: 1rem; line-height: 1;" title="Remove Member">❌</button>
                 </div>
             `;
             container.insertAdjacentHTML('beforeend', inputHTML);
@@ -1716,15 +1953,126 @@
             await submitBooking(e);
         };
 
+        let selectedIdFiles = [];
+
+        function handleIdPhotoSelection(input) {
+            if (!input.files) return;
+            for (let i = 0; i < input.files.length; i++) {
+                selectedIdFiles.push(input.files[i]);
+            }
+            renderPhotoPreviews();
+            input.value = '';
+        }
+
+        function removeSelectedPhoto(index) {
+            selectedIdFiles.splice(index, 1);
+            renderPhotoPreviews();
+        }
+
+        function renderPhotoPreviews() {
+            const grid = document.getElementById('photoPreviewGrid');
+            const textSpan = document.getElementById('fileButtonText');
+            if (!grid) return;
+            grid.innerHTML = '';
+            
+            if (selectedIdFiles.length === 0) {
+                grid.style.display = 'none';
+                if (textSpan) textSpan.textContent = 'Choose ID';
+                return;
+            }
+            
+            grid.style.display = 'flex';
+            grid.style.flexWrap = 'wrap';
+            grid.style.gap = '8px';
+            grid.style.marginTop = '10px';
+            
+            if (textSpan) textSpan.textContent = `${selectedIdFiles.length} Selected`;
+            
+            selectedIdFiles.forEach((file, idx) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const wrapper = document.createElement('div');
+                    wrapper.style.position = 'relative';
+                    wrapper.style.width = '60px';
+                    wrapper.style.height = '60px';
+                    wrapper.style.borderRadius = '8px';
+                    wrapper.style.overflow = 'hidden';
+                    wrapper.style.border = '1px solid rgba(212, 175, 55, 0.6)';
+                    
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'cover';
+                    
+                    const delBtn = document.createElement('button');
+                    delBtn.type = 'button';
+                    delBtn.innerHTML = '&times;';
+                    delBtn.style.position = 'absolute';
+                    delBtn.style.top = '2px';
+                    delBtn.style.right = '2px';
+                    delBtn.style.background = 'rgba(239, 68, 68, 0.9)';
+                    delBtn.style.color = '#fff';
+                    delBtn.style.border = 'none';
+                    delBtn.style.borderRadius = '50%';
+                    delBtn.style.width = '18px';
+                    delBtn.style.height = '18px';
+                    delBtn.style.fontSize = '12px';
+                    delBtn.style.fontWeight = 'bold';
+                    delBtn.style.cursor = 'pointer';
+                    delBtn.style.display = 'flex';
+                    delBtn.style.alignItems = 'center';
+                    delBtn.style.justifyContent = 'center';
+                    delBtn.onclick = function(ev) {
+                        ev.stopPropagation();
+                        removeSelectedPhoto(idx);
+                    };
+                    
+                    wrapper.appendChild(img);
+                    wrapper.appendChild(delBtn);
+                    grid.appendChild(wrapper);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
         async function submitBooking(e) {
             const form = document.getElementById('bookingForm');
 
+            // Process Main Guest Name & Age
+            const guestNameInput = document.getElementById('guestName').value.trim();
+            const guestAgeInput = document.getElementById('guestAge').value.trim();
+            const finalGuestName = guestAgeInput ? `${guestNameInput} (${guestAgeInput})` : guestNameInput;
+
             // Gather additional members
-            const memberInputs = document.querySelectorAll('.dashboard-member-name');
-            const membersList = Array.from(memberInputs).map(inp => inp.value.trim()).filter(val => val !== '');
+            const memberRows = document.querySelectorAll('.member-input-row');
+            const membersList = [];
+            memberRows.forEach(row => {
+                const nameInp = row.querySelector('.dashboard-member-name').value.trim();
+                const ageInp = row.querySelector('.dashboard-member-age').value.trim();
+                if (nameInp) {
+                    membersList.push(ageInp ? `${nameInp} (${ageInp})` : nameInp);
+                }
+            });
             document.getElementById('dashboardMembersInput').value = JSON.stringify(membersList);
 
+            if (selectedIdFiles.length < 1) {
+                showAlert('Validation Error', 'Primary ID photo is compulsory.', 'warning');
+                return;
+            }
+            if (membersList.length > 0 && selectedIdFiles.length < 2) {
+                showAlert('Validation Error', 'Minimum 2 ID photos required when there are multiple guests.', 'warning');
+                return;
+            }
+
             const formData = new FormData(form);
+            // Replace the raw guest_name with our combined one
+            formData.set('guest_name', finalGuestName);
+            formData.set('checkin_time', parseAmPmDateTime(formData.get('checkin_time')));
+            formData.delete('id_photos');
+            selectedIdFiles.forEach(file => {
+                formData.append('id_photos', file);
+            });
 
             // Handle multiple rooms
             const selectedRooms = [document.getElementById('bookingRoomId').value];
@@ -1753,6 +2101,8 @@
                     loadRooms();
                     loadFinancials();
                     form.reset();
+                    selectedIdFiles = [];
+                    renderPhotoPreviews();
                     window.forceOverrideBooking = false;
                     showAlert('Success', 'Booking Successful! 📅', 'success');
                 } else {
@@ -1788,10 +2138,10 @@
                     <p><strong>Check-in:</strong> ${booking.checkin_time}</p>
                     <p><strong>Initial:</strong> ₹${booking.amount}</p>
                 `;
+                document.getElementById('checkoutForm').reset();
                 const now = new Date();
                 now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-                document.getElementById('checkoutTime').value = now.toISOString().slice(0, 16);
-                document.getElementById('checkoutForm').reset();
+                document.getElementById('checkoutTime').value = formatAmPmDateTime(now.toISOString().slice(0, 16));
                 document.getElementById('checkoutModal').classList.add('show');
             } catch (error) { console.error('Error details:', error); }
         }
@@ -1800,7 +2150,7 @@
             e.preventDefault();
             const data = {
                 booking_id: document.getElementById('checkoutBookingId').value,
-                checkout_time: document.getElementById('checkoutTime').value,
+                checkout_time: parseAmPmDateTime(document.getElementById('checkoutTime').value),
                 food: parseFloat(document.getElementById('foodCharges').value) || 0,
                 laundry: parseFloat(document.getElementById('laundryCharges').value) || 0,
                 water_bottle: parseFloat(document.getElementById('waterBottleCharges').value) || 0,
@@ -2019,24 +2369,125 @@
         }
 
         // --- Guests ---
-        async function loadGuests() {
+        async function loadGuests(params = {}) {
             try {
-                const response = await fetch('/api/guests');
+                let url = '/api/guests';
+                const qs = new URLSearchParams(params).toString();
+                if (qs) url += '?' + qs;
+
+                const response = await fetch(url);
                 const guests = await response.json();
                 const tbody = document.getElementById('guestsTableBody');
-                if (!tbody) return; // Exit if guestsTableBody is not on the current page
+                if (!tbody) return;
+
+                if (!guests.length) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--text-secondary);">No guests found for this period.</td></tr>`;
+                    const rc = document.getElementById('guestResultCount');
+                    if (rc) rc.textContent = '0 guests found';
+                    return;
+                }
+
                 tbody.innerHTML = guests.map(guest => `
                     <tr>
-                        <td>${guest.guest_name}</td>
+                        <td>
+                            <strong style="color: var(--text-primary); font-size: 0.95rem;">${guest.guest_name}</strong>
+                            ${guest.members && guest.members.length ? `<div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; display: flex; flex-direction: column; gap: 2px;">${guest.members.map(m => `<span>👥 ${m}</span>`).join('')}</div>` : ''}
+                        </td>
                         <td class="mobile-hide">${guest.phone}</td>
-                        <td>${guest.room_id}</td>
+                        <td><span style="font-weight: 600; color: var(--gold);">${guest.room_id}</span></td>
                         <td class="mobile-hide">${guest.checkin_time}</td>
                         <td class="mobile-hide">${guest.checkout_time || '-'}</td>
                         <td><button class="btn btn-primary btn-sm" onclick="viewGuest(${guest.id})">View</button></td>
                     </tr>
                 `).join('');
+
+                const rc = document.getElementById('guestResultCount');
+                if (rc) rc.textContent = `${guests.length} guest${guests.length !== 1 ? 's' : ''} found`;
+
             } catch (error) { console.error('Error loading guests:', error); }
         }
+
+        // Helper to parse Name and Age from string or object
+        function parseMemberNameAndAge(memberItem) {
+            if (!memberItem) return { name: '', age: '' };
+            if (typeof memberItem === 'object') {
+                return {
+                    name: memberItem.name || memberItem.full_name || '',
+                    age: memberItem.age || ''
+                };
+            }
+            const str = String(memberItem).trim();
+            const match = str.match(/^(.*?)\s*\((\d+)\s*(?:yrs|years|yr|age)?\)$/i) || str.match(/^(.*?)\s*\((\d+)\)$/);
+            if (match) {
+                return { name: match[1].trim(), age: match[2].trim() };
+            }
+            return { name: str, age: '' };
+        }
+
+        // Toggle date/month pickers based on filter dropdown
+        function onGuestFilterChange() {
+            const filter = document.getElementById('guestDateFilter').value;
+            const dp = document.getElementById('guestDatePicker');
+            const mp = document.getElementById('guestMonthPicker');
+            dp.style.display  = filter === 'date'  ? 'block' : 'none';
+            mp.style.display  = filter === 'month' ? 'block' : 'none';
+        }
+
+        // Fetch from API with selected date/month
+        async function runGuestSearch() {
+            const filter = document.getElementById('guestDateFilter').value;
+            const params = {};
+            if (filter === 'date') {
+                const val = document.getElementById('guestDatePicker').value;
+                if (!val) return showAlert('Required', 'Please pick a date first.', 'warning');
+                params.date = val;
+            } else if (filter === 'month') {
+                const val = document.getElementById('guestMonthPicker').value;
+                if (!val) return showAlert('Required', 'Please pick a month first.', 'warning');
+                params.month = val;
+            }
+            await loadGuests(params);
+            // After API load, also apply any text typed
+            filterGuestsLocal();
+        }
+
+        // Reset all filters back to All Time
+        function clearGuestSearch() {
+            document.getElementById('guestDateFilter').value = 'all';
+            document.getElementById('guestDatePicker').style.display  = 'none';
+            document.getElementById('guestMonthPicker').style.display = 'none';
+            document.getElementById('guestSearchInput').value = '';
+            const rc = document.getElementById('guestResultCount');
+            if (rc) rc.textContent = '';
+            loadGuests();
+        }
+
+        // Local text filter (runs on already-loaded rows without an API call)
+        function filterGuestsLocal() {
+            const input  = document.getElementById('guestSearchInput');
+            if (!input) return;
+            const filter = input.value.toUpperCase().trim();
+            const tbody  = document.getElementById('guestsTableBody');
+            if (!tbody) return;
+            const rows   = tbody.getElementsByTagName('tr');
+            let visible  = 0;
+
+            for (let i = 0; i < rows.length; i++) {
+                const tds = rows[i].getElementsByTagName('td');
+                const name  = tds[0] ? (tds[0].textContent || '').toUpperCase() : '';
+                const phone = tds[1] ? (tds[1].textContent || '').toUpperCase() : '';
+                const room  = tds[2] ? (tds[2].textContent || '').toUpperCase() : '';
+                const show  = !filter || name.includes(filter) || phone.includes(filter) || room.includes(filter);
+                rows[i].style.display = show ? '' : 'none';
+                if (show) visible++;
+            }
+            const rc = document.getElementById('guestResultCount');
+            if (rc && rows.length) rc.textContent = `${visible} guest${visible !== 1 ? 's' : ''} found`;
+        }
+
+        // Keep old name working if referenced elsewhere
+        function filterGuests() { filterGuestsLocal(); }
+
 
         async function viewGuest(guestId) {
             try {
@@ -2052,15 +2503,19 @@
                     `<a href="/static/${photo}" target="_blank"><img src="/static/${photo}" style="height: 80px; margin-right: 10px; border-radius: 4px;"></a>`
                 ).join('') : 'No photos';
 
+                const memberNames = Array.isArray(guest.members) ? guest.members : [];
+                const membersFormatted = memberNames.map(m => `<div style="font-size: 1rem; color: var(--text-secondary); font-weight: 500; margin-top: 4px;">👥 ${m}</div>`).join('');
+
                 document.getElementById('guestProfileContent').innerHTML = `
                     <div id="guestDisplayView">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
                             <div>
                                 <p style="margin-bottom: 0.25rem; color: var(--text-secondary);">Guest Profile</p>
-                                <h2 style="color: var(--text-primary); margin: 0;">${guest.guest_name}</h2>
-                                <p style="color: var(--gold); font-size: 0.9rem; margin-top: 0.25rem;">${guestEmail}</p>
+                                <h2 style="color: var(--text-primary); margin: 0; line-height: 1.2;">${guest.guest_name}</h2>
+                                ${membersFormatted}
+                                <p style="color: var(--gold); font-size: 0.9rem; margin-top: 0.5rem;">${guestEmail}</p>
                             </div>
-                            <button class="btn btn-outline btn-sm" onclick="toggleGuestEdit(true)">✏️ Edit Profile</button>
+                            <button class="btn btn-outline btn-sm" onclick="toggleGuestEdit(true); return false;">✏️ Edit Profile</button>
                         </div>
 
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
@@ -2082,27 +2537,57 @@
                     </div>
 
                     <div id="guestEditView" style="display: none;">
-                        <h3 style="margin-bottom: 1.5rem;">Edit Guest Profile</h3>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                            <h3 style="margin: 0;">Edit Guest Profile</h3>
+                            <button type="button" class="close-btn" onclick="toggleGuestEdit(false); return false;" style="padding: 0; font-size: 1.5rem;">×</button>
+                        </div>
                         <input type="hidden" id="editGuestOldPhone" value="${guest.phone}">
+                        <input type="hidden" id="editGuestBookingId" value="${guest.id}">
                         <div class="form-group">
-                            <label>Full Name</label>
+                            <label>Primary Guest Name (with Age)</label>
                             <input type="text" id="editGuestName" class="form-control" value="${guest.guest_name}">
                         </div>
                         <div class="form-group">
                             <label>Email Address</label>
                             <input type="email" id="editGuestEmail" class="form-control" value="${guestEmail}" placeholder="guest@example.com">
                         </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div class="form-group">
+                                <label>Phone Number</label>
+                                <input type="tel" id="editGuestPhone" class="form-control" value="${guest.phone}">
+                            </div>
+                            <div class="form-group">
+                                <label>Room Amount (₹)</label>
+                                <input type="number" id="editGuestAmount" class="form-control" value="${guest.amount !== null ? guest.amount : ''}">
+                            </div>
+                        </div>
                         <div class="form-group">
-                            <label>Phone Number</label>
-                            <input type="tel" id="editGuestPhone" class="form-control" value="${guest.phone}">
+                            <label>Additional Guests (Name &amp; Age)</label>
+                            <div id="editMembersContainer">
+                                ${memberNames.map((m, i) => {
+                                    const parsed = parseMemberNameAndAge(m);
+                                    return `
+                                    <div style="display:flex; gap:6px; margin-bottom:6px; align-items:center;" id="editMemberRow_${i}" class="edit-member-row">
+                                        <input type="text" class="form-control edit-member-name" value="${parsed.name}" placeholder="Guest name" style="flex:2;">
+                                        <input type="number" class="form-control edit-member-age" value="${parsed.age}" placeholder="Age" min="0" style="width:80px; flex:0 0 80px;">
+                                        <button type="button" onclick="document.getElementById('editMemberRow_${i}').remove()" style="padding:6px 10px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.4); border-radius:8px; color:#ef4444; cursor:pointer;">✕</button>
+                                    </div>`;
+                                }).join('')}
+                            </div>
+                            <button type="button" onclick="addEditMemberField()" style="margin-top:6px; padding:8px 14px; background:rgba(168,85,247,0.12); border:1px dashed rgba(168,85,247,0.5); border-radius:8px; color:var(--primary-color); cursor:pointer; font-size:0.9rem;">+ Add Guest</button>
+                        </div>
+                        <div class="form-group">
+                            <label>Add / Update ID Photo</label>
+                            <input type="file" id="editGuestPhoto" class="form-control" accept="image/*,.pdf" multiple>
                         </div>
                         <div style="display: flex; gap: 10px; margin-top: 1.5rem;">
-                            <button class="btn btn-success" style="flex: 1;" onclick="saveGuestEdit()">Save Changes</button>
-                            <button class="btn btn-outline" style="flex: 1;" onclick="toggleGuestEdit(false)">Cancel</button>
+                            <button type="button" class="btn btn-success" style="flex: 1;" onclick="saveGuestEdit(); return false;">Save Changes</button>
+                            <button type="button" class="btn btn-outline" style="flex: 1;" onclick="toggleGuestEdit(false); return false;">Cancel</button>
                         </div>
                     </div>
 
-                    <div style="text-align: right; margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                        <button type="button" class="btn btn-primary" onclick="downloadGuestProfilePdf()">Download PDF</button>
                         <a href="/bill/${guest.id}" target="_blank" class="btn btn-primary">Print Bill</a>
                     </div>
                 `;
@@ -2110,35 +2595,125 @@
             } catch (error) { console.error('Error:', error); }
         }
 
+        function downloadGuestProfilePdf() {
+            const profileContent = document.getElementById('guestProfileContent');
+            if (!profileContent || !window.html2pdf) {
+                showAlert('Error', 'PDF export is not available in this browser.', 'error');
+                return;
+            }
+
+            const contentClone = profileContent.cloneNode(true);
+            const hiddenStyles = document.createElement('style');
+            hiddenStyles.textContent = `
+                body { background: #ffffff; color: #111827; }
+                #guestProfileContent { padding: 0; }
+                #guestDisplayView, #guestEditView { display: block !important; }
+                .btn, .close-btn, .modal-header { display: none !important; }
+                .form-group, .form-control, input, label { display: none !important; }
+                small { color: #4b5563; }
+                h2, h3 { color: #111827; }
+                * { box-sizing: border-box; }
+            `;
+            contentClone.appendChild(hiddenStyles);
+
+            const opt = {
+                margin: [0.5, 0.5, 0.5, 0.5],
+                filename: `guest-profile-${Date.now()}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(contentClone).save();
+        }
+
         function toggleGuestEdit(show) {
-            document.getElementById('guestDisplayView').style.display = show ? 'none' : 'block';
-            document.getElementById('guestEditView').style.display = show ? 'block' : 'none';
+            const displayView = document.getElementById('guestDisplayView');
+            const editView = document.getElementById('guestEditView');
+            
+            if (!displayView || !editView) {
+                console.error('Could not find guestDisplayView or guestEditView');
+                return;
+            }
+            
+            displayView.style.display = show ? 'none' : 'block';
+            editView.style.display = show ? 'block' : 'none';
+            
+            // Ensure the modal content is scrolled to top
+            if (show) {
+                const modalContent = document.querySelector('.modal-content');
+                if (modalContent) modalContent.scrollTop = 0;
+            }
+            
+            console.log('Guest edit view toggled:', { show, displayHidden: show, editVisible: show });
+        }
+
+        function addEditMemberField(name = '', age = '') {
+            const container = document.getElementById('editMembersContainer');
+            if (!container) return;
+            const idx = Date.now() + Math.random().toString(36).substr(2, 4);
+            const div = document.createElement('div');
+            div.id = `editMemberRow_${idx}`;
+            div.className = 'edit-member-row';
+            div.style.cssText = 'display:flex; gap:6px; margin-bottom:6px; align-items:center;';
+            div.innerHTML = `
+                <input type="text" class="form-control edit-member-name" placeholder="Guest name" value="${name}" style="flex:2;">
+                <input type="number" class="form-control edit-member-age" placeholder="Age" min="0" value="${age}" style="width:80px; flex:0 0 80px;">
+                <button type="button" onclick="document.getElementById('editMemberRow_${idx}').remove()" style="padding:6px 10px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.4); border-radius:8px; color:#ef4444; cursor:pointer;">✕</button>
+            `;
+            container.appendChild(div);
         }
 
         async function saveGuestEdit() {
             const oldPhone = document.getElementById('editGuestOldPhone').value;
-            const data = {
-                old_phone: oldPhone,
-                name: document.getElementById('editGuestName').value,
-                email: document.getElementById('editGuestEmail').value,
-                phone: document.getElementById('editGuestPhone').value
-            };
+            const bookingId = document.getElementById('editGuestBookingId')?.value;
+            const name = document.getElementById('editGuestName').value.trim();
+            const email = document.getElementById('editGuestEmail').value.trim();
+            const phone = document.getElementById('editGuestPhone').value.trim();
 
-            if (!data.name || !data.phone) return showAlert('Missing Fields', 'Name and Phone are required', 'warning');
+            if (!name || !phone) return showAlert('Missing Fields', 'Name and Phone are required', 'warning');
+
+            // Collect member names & ages from edit form
+            const memberRows = document.querySelectorAll('.edit-member-row');
+            const membersList = [];
+            memberRows.forEach(row => {
+                const nameInp = row.querySelector('.edit-member-name')?.value.trim();
+                const ageInp = row.querySelector('.edit-member-age')?.value.trim();
+                if (nameInp) {
+                    membersList.push(ageInp ? `${nameInp} (${ageInp})` : nameInp);
+                }
+            });
+
+            const amount = document.getElementById('editGuestAmount').value.trim();
+
+            const formData = new FormData();
+            formData.append('old_phone', oldPhone);
+            formData.append('name', name);
+            formData.append('email', email);
+            formData.append('phone', phone);
+            if (amount) formData.append('amount', amount);
+            if (bookingId) formData.append('booking_id', bookingId);
+            formData.append('members', JSON.stringify(membersList));
+
+            const fileInput = document.getElementById('editGuestPhoto');
+            if (fileInput && fileInput.files) {
+                for (let i = 0; i < fileInput.files.length; i++) {
+                    formData.append('id_photos', fileInput.files[i]);
+                }
+            }
 
             try {
                 const response = await fetch('/api/guest/update', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    body: formData
                 });
                 const result = await response.json();
                 if (result.success) {
-                    showAlert('Success', 'Guest profile updated successfully', 'success');
-                    closeModal('guestProfileModal');
+                    showAlert('Success', 'Guest profile updated successfully!', 'success');
+                    toggleGuestEdit(false);
+                    viewGuest(bookingId);
                     loadGuests();
                 } else {
-                    showAlert('Error', result.message || 'Failed to update profile', 'error');
                 }
             } catch (error) {
                 console.error('Error saving guest edit:', error);
@@ -2179,6 +2754,20 @@
         // --- Expenses ---
         async function loadExpenses(params = {}) {
             try {
+                // Fetch and update summary cards first
+                try {
+                    const summaryResponse = await fetch('/api/expenses/summary');
+                    if (summaryResponse.ok) {
+                        const summary = await summaryResponse.json();
+                        if (summary.success) {
+                            document.getElementById('expenseTotalAllTime').textContent = `₹${summary.total_all_time.toLocaleString()}`;
+                            document.getElementById('expenseTotalToday').textContent = `₹${summary.total_today.toLocaleString()}`;
+                        }
+                    }
+                } catch (summaryError) {
+                    console.error('Error fetching expense summary:', summaryError);
+                }
+
                 let url = '/api/expenses';
                 const query = new URLSearchParams(params).toString();
                 if (query) url += '?' + query;
@@ -2186,6 +2775,21 @@
                 const response = await fetch(url);
                 if (!response.ok) throw new Error('Failed to fetch expenses');
                 const expenses = await response.json();
+                
+                // Calculate filtered total
+                const filteredTotal = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+                document.getElementById('expenseTotalFiltered').textContent = `₹${filteredTotal.toLocaleString()}`;
+                
+                // Update filtered label based on search range
+                const range = document.getElementById('expenseSearchRange').value;
+                const label = document.getElementById('expenseFilteredLabel');
+                if (label) {
+                    if (range === 'daily') label.textContent = 'Filtered Daily Total';
+                    else if (range === 'monthly') label.textContent = 'Filtered Monthly Total';
+                    else if (range === 'yearly') label.textContent = 'Filtered Yearly Total';
+                    else label.textContent = 'Filtered Total (All Time)';
+                }
+
                 const container = document.getElementById('expenseList');
                 if (!container) return;
 
@@ -2267,6 +2871,7 @@
             const name = document.getElementById('expenseName').value;
             const amount = document.getElementById('expenseAmount').value;
             const category = document.getElementById('expenseCategory').value;
+            const date = document.getElementById('expenseDate').value;
 
             if (!name || !amount) {
                 showAlert('Missing Fields', 'Please enter both name and amount.', 'warning');
@@ -2280,7 +2885,8 @@
                     body: JSON.stringify({
                         name: name,
                         amount: parseFloat(amount),
-                        category: category
+                        category: category,
+                        date: date
                     })
                 });
 
@@ -2293,6 +2899,7 @@
                 if (result.success) {
                     document.getElementById('expenseName').value = '';
                     document.getElementById('expenseAmount').value = '';
+                    document.getElementById('expenseDate').value = new Date().toISOString().split('T')[0];
                     showAlert('Success', 'Expense added successfully!', 'success');
                     loadExpenses();
                     if (window.updateFinancials) updateFinancials();
@@ -2331,37 +2938,44 @@
         }
 
         // --- System Maintenance ---
-        async function restoreSystem() {
+        function viewDatabaseAsPdf() {
+            window.open('/report/full-database', '_blank');
+        }
+
+        async function viewBackup() {
             const fileInput = document.getElementById('backupFile');
             const file = fileInput.files[0];
+            
             if (!file) { showAlert('Error', 'Please select a backup zip file first.', 'warning'); return; }
-
-            showConfirm('Restore System', 'CRITICAL WARNING: This will DELETE all current data! Proceed?', async () => {
-                const formData = new FormData();
-                formData.append('backup_zip', file);
-
-                try {
-                    const button = document.querySelector('[onclick="restoreSystem()"]');
-                    const originalText = button.textContent;
-                    button.textContent = 'Restoring...';
-                    button.disabled = true;
-
-                    const response = await fetch('/api/restore', { method: 'POST', body: formData });
-                    const result = await response.json();
-
-                    if (result.success) {
-                        showAlert('Success', result.message, 'success');
-                        setTimeout(() => window.location.reload(), 2000);
-                    } else {
-                        showAlert('Restore Failed', result.message, 'error');
-                        button.textContent = originalText;
-                        button.disabled = false;
-                    }
-                } catch (error) {
-                    console.error('Error restoring system:', error);
-                    showAlert('Error', 'An error occurred during restore.', 'error');
+            
+            const button = document.querySelector('button[onclick="viewBackup()"]');
+            const originalText = button.textContent;
+            button.textContent = 'Processing...';
+            button.disabled = true;
+            
+            const formData = new FormData();
+            formData.append('backup_zip', file);
+            
+            try {
+                const res = await fetch('/api/backup/view', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                
+                button.textContent = originalText;
+                button.disabled = false;
+                
+                if (data.success) {
+                    window.open(`/backup_viewer/${data.backup_id}`, '_blank');
+                } else {
+                    showAlert('Error', data.message || 'Failed to process backup.', 'error');
                 }
-            });
+            } catch (err) {
+                button.textContent = originalText;
+                button.disabled = false;
+                showAlert('Error', 'Network error. Please try again.', 'error');
+            }
         }
 
         // --- Modals & Global events ---
@@ -2375,6 +2989,41 @@
             const nav = document.querySelector('.header-nav');
             nav.classList.toggle('show');
         }
+
+        // --- Sidebar Refresh Button ---
+        function sidebarRefresh() {
+            const icon = document.getElementById('refreshIcon');
+            const btn  = document.getElementById('sidebarRefreshBtn');
+            if (icon) {
+                icon.style.transition = 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+                icon.style.transform  = 'rotate(360deg)';
+            }
+            if (btn) {
+                btn.style.opacity = '0.7';
+                btn.disabled = true;
+            }
+            // Give the spin a moment to show then reload
+            setTimeout(() => window.location.reload(), 500);
+        }
+
+        // Hover style for refresh button (JS because inline :hover not supported)
+        document.addEventListener('DOMContentLoaded', () => {
+            const btn = document.getElementById('sidebarRefreshBtn');
+            if (btn) {
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.background = 'rgba(168,85,247,0.25)';
+                    btn.style.borderColor = 'var(--primary-color)';
+                    btn.style.transform = 'translateY(-1px)';
+                    btn.style.boxShadow = '0 4px 12px rgba(168,85,247,0.2)';
+                });
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.background = 'rgba(168,85,247,0.12)';
+                    btn.style.borderColor = 'rgba(168,85,247,0.35)';
+                    btn.style.transform = 'translateY(0)';
+                    btn.style.boxShadow = 'none';
+                });
+            }
+        });
 
         // Close menu when clicking outside
         window.onclick = (e) => {
@@ -2393,9 +3042,9 @@
         window.confirmOverride = confirmOverride;
         window.openBookingModal = openBookingModal;
         window.openCheckoutModal = openCheckoutModal;
-        window.searchGuest = searchGuest;
+        if (typeof searchGuest !== 'undefined') window.searchGuest = searchGuest;
         window.addExpense = addExpense;
-        window.restoreSystem = restoreSystem;
+        if (typeof restoreSystem !== 'undefined') window.restoreSystem = restoreSystem;
         window.updateFinancials = updateFinancials;
         window.exportFinancials = () => exportToPDF('financial', 'Financial_Report');
         window.exportToExcel = exportToExcel;
@@ -2624,7 +3273,7 @@
             // Set default check-in time to now
             const now = new Date();
             const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-            document.getElementById('acceptCheckinTime').value = localISO;
+            document.getElementById('acceptCheckinTime').value = formatAmPmDateTime(localISO);
 
             // Load available rooms into cache
             try {
@@ -2678,8 +3327,8 @@
 
         async function confirmAcceptCheckin() {
             const requestId = document.getElementById('acceptRequestId').value;
-            const checkinTime = document.getElementById('acceptCheckinTime').value;
-            const checkoutTime = document.getElementById('acceptCheckoutTime').value;
+            const checkinTime = parseAmPmDateTime(document.getElementById('acceptCheckinTime').value);
+            const checkoutTime = parseAmPmDateTime(document.getElementById('acceptCheckoutTime').value);
 
             // Collect all room rows
             const selects = document.querySelectorAll('.room-row-select');

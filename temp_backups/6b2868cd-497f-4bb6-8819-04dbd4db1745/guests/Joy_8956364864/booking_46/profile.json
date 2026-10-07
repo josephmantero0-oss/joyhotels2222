@@ -1,0 +1,11 @@
+{
+  "name": "Joy",
+  "phone": "8956364864",
+  "address": "Kankavli ",
+  "members": null,
+  "checkin": "2026-05-14T12:21",
+  "checkout": "2026-05-16T14:17",
+  "amount": 1500.0,
+  "status": "completed",
+  "rooms": "101"
+}

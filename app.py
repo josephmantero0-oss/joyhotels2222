@@ -4,6 +4,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from functools import wraps
 import secrets
+import json
 import os
 import zipfile
 import io
@@ -33,6 +34,27 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Create upload folder if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+def save_uploaded_file(file, prefix='id'):
+    """Robustly save uploaded image file with guaranteed extension and safe filename."""
+    if not file or not getattr(file, 'filename', None):
+        return None
+    raw_filename = file.filename
+    ext = os.path.splitext(raw_filename)[1].lower()
+    allowed_exts = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.bmp', '.pdf']
+    if not ext or ext not in allowed_exts:
+        ext = '.jpg'
+    safe_base = secure_filename(os.path.splitext(raw_filename)[0])
+    if not safe_base:
+        safe_base = 'photo'
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S_%f')[:18]
+    filename = f"{prefix}_{timestamp}_{safe_base}{ext}"
+    upload_dir = app.config['UPLOAD_FOLDER']
+    os.makedirs(upload_dir, exist_ok=True)
+    filepath = os.path.join(upload_dir, filename)
+    file.save(filepath)
+    return f"uploads/{filename}"
+
 
 # Prevent Caching on all API responses to avoid data leak between sessions
 @app.after_request
@@ -382,7 +404,7 @@ def send_backup_email(to_email, hotel_name):
     smtp_password = os.environ.get('SMTP_PASSWORD')
 
     if not smtp_user or not smtp_password:
-        return False
+        return False, "SMTP_USER or SMTP_PASSWORD environment variables are not set in .env"
 
     try:
         msg = MIMEMultipart()
@@ -404,10 +426,10 @@ def send_backup_email(to_email, hotel_name):
         server.login(smtp_user, smtp_password)
         server.send_message(msg)
         server.quit()
-        return True
+        return True, "Success"
     except Exception as e:
         print(f"Backup Error: {e}")
-        return False
+        return False, str(e)
 
 @app.route('/api/settings/backup', methods=['POST'])
 @owner_required
@@ -420,19 +442,24 @@ def trigger_backup():
     conn.close()
     
     if not row or not row[0]:
-        return jsonify({'success': False, 'message': 'Owner email not set'})
+        return jsonify({'success': False, 'message': 'Owner email not set in Settings -> Hotel Profile'})
         
-    success = send_backup_email(row[0], row[1])
+    success, message = send_backup_email(row[0], row[1])
     if success:
         log_action(session.get('user_id'), 'BACKUP', "Database backup sent to email", hotel_id)
         return jsonify({'success': True})
     else:
-        return jsonify({'success': False, 'message': 'Failed to send email. Check SMTP settings.'})
+        return jsonify({'success': False, 'message': f"Failed to send email: {message}"})
 
 # Routes
 @app.route('/')
 def index():
-    # Allow viewing landing page even if logged in
+    if 'logged_in' in session:
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+@app.route('/landing')
+def landing_page():
     return render_template('landing.html')
 
 @app.route('/restaurant')
@@ -1691,17 +1718,37 @@ def book_room():
                 c.execute("UPDATE bookings SET status = 'fulfilled' WHERE hotel_id = ? AND room_id = ? AND status = 'reserved' AND date(checkin_time) <= ? AND date(checkout_time) >= ?",
                           (hotel_id, rid, checkin_date, checkin_date))
 
+    import json
+    members = data.get('members', '[]')
+    try:
+        members_data = json.loads(members)
+    except:
+        members_data = []
+
     id_photo_paths = []
+    base_room = room_ids[0] if room_ids else 'room'
+    
+    # Collect files from all photo file input keys
+    upload_files = []
     if 'id_photos' in request.files:
-        files = request.files.getlist('id_photos')
-        for file in files:
-            if file and file.filename:
-                # Use hotel_id prefix for isolation
-                base_room = room_ids[0]
-                filename = secure_filename(f"h{hotel_id}_{base_room}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.filename}")
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(filepath)
-                id_photo_paths.append(f"uploads/{filename}")
+        upload_files.extend(request.files.getlist('id_photos'))
+    if 'id_photo' in request.files:
+        upload_files.extend(request.files.getlist('id_photo'))
+        
+    for file in upload_files:
+        if file and getattr(file, 'filename', None):
+            rel_path = save_uploaded_file(file, prefix=f"h{hotel_id}_{base_room}")
+            if rel_path:
+                id_photo_paths.append(rel_path)
+
+    if len(members_data) == 0:
+        if len(id_photo_paths) < 1:
+            conn.close()
+            return jsonify({'success': False, 'message': 'ID Photo is compulsory for primary guest'})
+    else:
+        if len(id_photo_paths) < 2:
+            conn.close()
+            return jsonify({'success': False, 'message': 'Minimum 2 ID photos required when there are multiple guests'})
 
     id_photos_str = ','.join(id_photo_paths) if id_photo_paths else None
     main_room_str = ','.join(room_ids)
@@ -2156,18 +2203,7 @@ def get_reports():
         'yearly': yearly
     })
 
-@app.route('/api/guest/<int:booking_id>')
-@login_required
-def get_booking_guest_details(booking_id):
-    conn = get_db_connection()
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute('SELECT * FROM bookings WHERE id = ?', (booking_id,))
-    booking = c.fetchone()
-    conn.close()
-    if booking:
-        return jsonify(dict(booking))
-    return jsonify({'error': 'Not found'}), 404
+
 
 @app.route('/api/reserve', methods=['POST', 'DELETE'])
 @login_required
@@ -2213,13 +2249,63 @@ def reserve_room():
 @login_required
 def get_guests():
     hotel_id = session.get('hotel_id')
+    date_q  = request.args.get('date')   # YYYY-MM-DD
+    month_q = request.args.get('month')  # YYYY-MM
+
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute('''SELECT id, guest_name, phone, checkin_time, checkout_time, room_id
-                 FROM bookings WHERE hotel_id = ? ORDER BY id DESC''', (hotel_id,))
-    guests = [{'id': row[0], 'guest_name': row[1], 'phone': row[2],
-               'checkin_time': row[3], 'checkout_time': row[4], 'room_id': row[5]}
-              for row in c.fetchall()]
+
+    query  = '''SELECT id, guest_name, phone, checkin_time, checkout_time, room_id, members
+                FROM bookings WHERE hotel_id = ?'''
+    params = [hotel_id]
+
+    if date_q:
+        query += ' AND checkin_time LIKE ?'
+        params.append(f'{date_q}%')
+    elif month_q:
+        query += ' AND checkin_time LIKE ?'
+        params.append(f'{month_q}%')
+
+    query += ' ORDER BY id DESC'
+    c.execute(query, params)
+    guests = []
+    for row in c.fetchall():
+        members = []
+        if row[6]:
+            try:
+                import json
+                parsed = json.loads(row[6])
+                if isinstance(parsed, list):
+                    for item in parsed:
+                        if isinstance(item, dict):
+                            name = item.get('name') or item.get('full_name')
+                            age = item.get('age')
+                            if name:
+                                if age:
+                                    members.append(f"{name} ({age})")
+                                else:
+                                    members.append(name)
+                        elif item:
+                            members.append(str(item))
+                elif isinstance(parsed, dict):
+                    name = parsed.get('name') or parsed.get('full_name')
+                    age = parsed.get('age')
+                    if name:
+                        if age:
+                            members.append(f"{name} ({age})")
+                        else:
+                            members.append(name)
+            except Exception:
+                members = []
+        guests.append({
+            'id': row[0],
+            'guest_name': row[1],
+            'phone': row[2],
+            'checkin_time': row[3],
+            'checkout_time': row[4],
+            'room_id': row[5],
+            'members': members
+        })
     conn.close()
     return jsonify(guests)
 
@@ -2227,21 +2313,38 @@ def get_guests():
 @login_required
 def update_guest():
     try:
-        data = request.json
+        if request.is_json:
+            data = request.json or {}
+        else:
+            data = request.form or {}
+            
         hotel_id = session.get('hotel_id')
         old_phone = data.get('old_phone')
         new_name = data.get('name')
         new_email = data.get('email')
         new_phone = data.get('phone')
+        booking_id = data.get('booking_id')
+        members_json = data.get('members')
+        new_amount = data.get('amount')
         
         if not all([old_phone, new_name, new_phone]):
             return jsonify({'success': False, 'message': 'Missing required fields'})
             
+        # Process any uploaded photos
+        new_id_photos = []
+        for key in ['id_photo', 'id_photos']:
+            if key in request.files:
+                for file in request.files.getlist(key):
+                    rel_path = save_uploaded_file(file, prefix=f"h{hotel_id}_update")
+                    if rel_path:
+                        new_id_photos.append(rel_path)
+                        
         conn = get_db_connection()
         c = conn.cursor()
         
         try:
-            # 1. Update Guests table
+            target_phone = new_phone if old_phone != new_phone else old_phone
+
             if old_phone != new_phone:
                 c.execute("SELECT phone FROM guests WHERE phone = ? AND hotel_id = ?", (new_phone, hotel_id))
                 if c.fetchone():
@@ -2251,7 +2354,6 @@ def update_guest():
                              WHERE phone = ? AND hotel_id = ?""",
                           (new_phone, new_name, new_email, old_phone, hotel_id))
                 
-                # Update corresponding history/references
                 c.execute("UPDATE bookings SET phone = ?, guest_name = ? WHERE phone = ? AND hotel_id = ?",
                           (new_phone, new_name, old_phone, hotel_id))
                 c.execute("UPDATE restaurant_bills SET customer_mobile = ? WHERE customer_mobile = ? AND hotel_id = ?",
@@ -2263,6 +2365,23 @@ def update_guest():
                 
                 c.execute("UPDATE bookings SET guest_name = ? WHERE phone = ? AND hotel_id = ?",
                           (new_name, old_phone, hotel_id))
+
+            # Update members and amount on the specific booking if booking_id supplied
+            if booking_id:
+                if members_json is not None:
+                    c.execute("UPDATE bookings SET members = ? WHERE id = ? AND hotel_id = ?",
+                              (members_json, booking_id, hotel_id))
+                if new_amount is not None:
+                    c.execute("UPDATE bookings SET amount = ? WHERE id = ? AND hotel_id = ?",
+                              (new_amount, booking_id, hotel_id))
+
+            if new_id_photos:
+                photo_str = ','.join(new_id_photos)
+                c.execute("""UPDATE bookings SET id_photo = CASE 
+                             WHEN id_photo IS NULL OR id_photo = '' THEN ? 
+                             ELSE id_photo || ',' || ? END 
+                             WHERE phone = ? AND hotel_id = ?""",
+                          (photo_str, photo_str, target_phone, hotel_id))
 
             conn.commit()
             return jsonify({'success': True})
@@ -2280,17 +2399,48 @@ def update_guest():
 def get_guest_details(guest_id):
     hotel_id = session.get('hotel_id')
     conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute('SELECT * FROM bookings WHERE id = ? AND hotel_id = ?', (guest_id, hotel_id))
     row = c.fetchone()
     conn.close()
 
     if row:
+        raw_members = row['members'] if 'members' in row.keys() else '[]'
+        member_names = []
+        try:
+            if raw_members:
+                parsed_members = json.loads(raw_members)
+                if isinstance(parsed_members, list):
+                    for member in parsed_members:
+                        if isinstance(member, dict):
+                            name = member.get('name') or member.get('full_name')
+                            age = member.get('age')
+                            if name:
+                                if age:
+                                    member_names.append(f"{name} ({age})")
+                                else:
+                                    member_names.append(name)
+                        elif member:
+                            member_names.append(str(member))
+                elif isinstance(parsed_members, dict):
+                    name = parsed_members.get('name') or parsed_members.get('full_name')
+                    age = parsed_members.get('age')
+                    if name:
+                        if age:
+                            member_names.append(f"{name} ({age})")
+                        else:
+                            member_names.append(name)
+        except Exception:
+            member_names = []
+
         guest = {
-            'id': row[0], 'room_id': row[2], 'guest_name': row[3], 'phone': row[4],
-            'address': row[5], 'id_number': row[6], 'id_photo': row[7], 'amount': row[8],
-            'checkin_time': row[9], 'checkout_time': row[10], 'extra_charges': row[11],
-            'food': row[12], 'laundry': row[13], 'water_bottle': row[14], 'car_wash': row[15]
+            'id': row['id'], 'room_id': row['room_id'], 'guest_name': row['guest_name'], 'phone': row['phone'],
+            'address': row['address'], 'id_number': row['id_number'], 'id_photo': row['id_photo'],
+            'amount': row['amount'], 'checkin_time': row['checkin_time'], 'checkout_time': row['checkout_time'],
+            'extra_charges': row['extra_charges'],
+            'food': row['food'], 'laundry': row['laundry'], 'water_bottle': row['water_bottle'], 'car_wash': row['car_wash'],
+            'members': member_names
         }
         return jsonify(guest)
     return jsonify({'error': 'Not found'}), 404
@@ -2305,7 +2455,17 @@ def expenses():
 
         if request.method == 'POST':
             data = request.json
-            date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            user_date = data.get('date')
+            if user_date:
+                # If only date is selected (YYYY-MM-DD), append the current time of day
+                if len(user_date) == 10:
+                    current_time = datetime.now().strftime('%H:%M:%S')
+                    date = f"{user_date} {current_time}"
+                else:
+                    date = user_date
+            else:
+                date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
             category = data.get('category', 'General')
             c.execute('INSERT INTO expenses (hotel_id, name, amount, category, date) VALUES (?, ?, ?, ?, ?)',
                       (hotel_id, data['name'], data['amount'], category, date))
@@ -2364,6 +2524,32 @@ def delete_expense():
     log_action(session.get('user_id'), 'DELETE_EXPENSE', f"Deleted Expense ID {expense_id}", hotel_id)
     
     return jsonify({'success': True})
+
+@app.route('/api/expenses/summary')
+@login_required
+def expenses_summary():
+    try:
+        hotel_id = session.get('hotel_id')
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 1. Total All Time
+        c.execute("SELECT SUM(amount) FROM expenses WHERE hotel_id = ?", (hotel_id,))
+        total_all_time = c.fetchone()[0] or 0
+        
+        # 2. Total Today (local date format YYYY-MM-DD)
+        local_today = datetime.now().strftime('%Y-%m-%d')
+        c.execute("SELECT SUM(amount) FROM expenses WHERE hotel_id = ? AND date LIKE ?", (hotel_id, f"{local_today}%"))
+        total_today = c.fetchone()[0] or 0
+        
+        conn.close()
+        return jsonify({
+            'success': True,
+            'total_all_time': total_all_time,
+            'total_today': total_today
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/guests/delete', methods=['POST'])
 @owner_required
@@ -2666,10 +2852,126 @@ def backup_system():
         download_name=f"backup_{datetime.now().strftime('%Y%m%d')}.zip",
         as_attachment=True
     )
-@app.route('/api/restore', methods=['POST'])
+
+@app.route('/api/backup/export_all')
 @login_required
 @admin_required
-def restore_system():
+def export_all_formats():
+    hotel_id = session.get('hotel_id')
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('SELECT name FROM hotels WHERE id = ?', (hotel_id,))
+    hotel_row = c.fetchone()
+    conn.close()
+    
+    hotel_name = hotel_row[0] if hotel_row else 'Hotel'
+    import export_generator
+    zip_buffer = export_generator.generate_multi_backup(hotel_id, hotel_name)
+    
+    return send_file(
+        zip_buffer,
+        download_name=f"Guest_History_Export_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
+        as_attachment=True
+    )
+
+@app.route('/report/full-database')
+@login_required
+@admin_required
+def full_database_report():
+    hotel_id = session.get('hotel_id')
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('''SELECT id, guest_name, phone, room_id, checkin_time, checkout_time,
+                        amount, extra_charges, food, laundry, water_bottle, car_wash,
+                        members, address, id_number, status
+                 FROM bookings WHERE hotel_id = ? ORDER BY id DESC''', (hotel_id,))
+    bookings = c.fetchall()
+    c.execute('SELECT name FROM hotels WHERE id = ?', (hotel_id,))
+    hotel_row = c.fetchone()
+    conn.close()
+
+    hotel_name = hotel_row['name'] if hotel_row else 'Hotel'
+    now_str = datetime.now().strftime('%d %b %Y, %I:%M %p')
+
+    rows_html = ''
+    for b in bookings:
+        raw_members = b['members'] or '[]'
+        try:
+            members_list = json.loads(raw_members)
+            if isinstance(members_list, list):
+                member_str = ', '.join([
+                    m if isinstance(m, str) else (
+                        f"{m.get('name')} ({m.get('age')})" if m.get('age') else (m.get('name') or '')
+                    ) for m in members_list if m
+                ])
+            else:
+                member_str = ''
+        except Exception:
+            member_str = ''
+        all_names = b['guest_name'] or ''
+        if member_str:
+            all_names += '<br><small style="color:#6b7280;">' + member_str + '</small>'
+        total = (b['amount'] or 0) + (b['extra_charges'] or 0) + (b['food'] or 0) + \
+                (b['laundry'] or 0) + (b['water_bottle'] or 0) + (b['car_wash'] or 0)
+        status = b['status'] or '-'
+        bg = '#d1fae5' if status == 'active' else '#fee2e2'
+        fg = '#065f46' if status == 'active' else '#991b1b'
+        rows_html += f'''
+        <tr>
+            <td>{b["id"]}</td>
+            <td>{all_names}</td>
+            <td>{b["phone"] or "-"}</td>
+            <td>{b["room_id"] or "-"}</td>
+            <td>{b["checkin_time"] or "-"}</td>
+            <td>{b["checkout_time"] or "Active"}</td>
+            <td>&#8377;{total:.0f}</td>
+            <td><span style="padding:2px 8px;border-radius:4px;background:{bg};color:{fg};">{status}</span></td>
+        </tr>'''
+
+    html = f'''<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{hotel_name} &ndash; Full Guest Report</title>
+<style>
+  body {{ font-family: Arial, sans-serif; padding: 24px; color: #111; background: #fff; }}
+  h1 {{ color: #4f46e5; margin-bottom: 4px; }}
+  .meta {{ color: #6b7280; font-size: 0.9rem; margin-bottom: 24px; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 0.85rem; }}
+  th {{ background: #4f46e5; color: #fff; padding: 10px 8px; text-align: left; }}
+  td {{ padding: 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }}
+  tr:nth-child(even) {{ background: #f9fafb; }}
+  @media print {{ .no-print {{ display: none; }} }}
+</style>
+</head>
+<body>
+  <h1>&#127968; {hotel_name}</h1>
+  <p class="meta">Full Guest Database Report &nbsp;|&nbsp; Generated: {now_str}</p>
+  <button class="no-print" onclick="window.print()" style="margin-bottom:16px;padding:8px 20px;background:#4f46e5;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.95rem;">&#128424;&#65039; Print / Save as PDF</button>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>Guest Name(s)</th><th>Phone</th><th>Room</th>
+        <th>Check-in</th><th>Check-out</th><th>Total</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>{rows_html}</tbody>
+  </table>
+  <p class="meta" style="margin-top:20px;">Total records: {len(bookings)}</p>
+</body>
+</html>'''
+    from flask import make_response
+    resp = make_response(html)
+    resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+    return resp
+import uuid
+import shutil
+
+@app.route('/api/backup/view', methods=['POST'])
+@login_required
+@admin_required
+def view_backup():
     if 'backup_zip' not in request.files:
         return jsonify({'success': False, 'message': 'No file uploaded'})
         
@@ -2679,12 +2981,74 @@ def restore_system():
 
     if file:
         try:
-            with zipfile.ZipFile(file) as zf:
-                zf.extractall('.')
+            backup_id = str(uuid.uuid4())
+            backup_dir = os.path.join('temp_backups', backup_id)
+            os.makedirs(backup_dir, exist_ok=True)
+            
+            temp_zip_path = os.path.join(backup_dir, 'uploaded_backup.zip')
+            file.save(temp_zip_path)
+            
+            with zipfile.ZipFile(temp_zip_path, 'r') as zf:
+                zf.extractall(backup_dir)
                 
-            return jsonify({'success': True, 'message': 'System restored successfully. Please reload.'})
+            return jsonify({'success': True, 'backup_id': backup_id})
         except Exception as e:
             return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/backup_viewer/<backup_id>')
+@login_required
+@admin_required
+def backup_viewer(backup_id):
+    backup_db_path = os.path.join('temp_backups', backup_id, 'hotel.db')
+    if not os.path.exists(backup_db_path):
+        return "Backup not found or expired", 404
+    return render_template('backup_viewer.html', backup_id=backup_id)
+
+@app.route('/api/backup/data/<backup_id>')
+@login_required
+@admin_required
+def backup_data(backup_id):
+    backup_db_path = os.path.join('temp_backups', backup_id, 'hotel.db')
+    if not os.path.exists(backup_db_path):
+        return jsonify({'success': False, 'message': 'Backup DB not found'})
+        
+    hotel_id = session.get('hotel_id')
+    try:
+        conn = sqlite3.connect(backup_db_path)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        
+        # Get bookings
+        c.execute('''
+            SELECT b.*, GROUP_CONCAT(br.room_id) as room_ids 
+            FROM bookings b 
+            LEFT JOIN booking_rooms br ON b.id = br.booking_id 
+            WHERE b.hotel_id = ? 
+            GROUP BY b.id
+            ORDER BY b.checkin_time DESC
+        ''', (hotel_id,))
+        bookings = [dict(row) for row in c.fetchall()]
+        
+        # Get guests
+        c.execute('SELECT * FROM guests WHERE hotel_id = ?', (hotel_id,))
+        guests = [dict(row) for row in c.fetchall()]
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'bookings': bookings,
+            'guests': guests
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/backup_viewer/media/<backup_id>/<path:filename>')
+@login_required
+@admin_required
+def backup_media(backup_id, filename):
+    backup_upload_path = os.path.join(os.getcwd(), 'temp_backups', backup_id)
+    return send_from_directory(backup_upload_path, filename)
 
 # --- Housekeeping Portal (No Login Required) ---
 @app.route('/hk/<token>')
@@ -2957,7 +3321,7 @@ def check_and_send_backup(hotel_id, user_id):
 
             # Mock Sending Backup
 
-            print(f"\n[x  BACKUP] Auto-generating backup for User {user_id}...")
+            print(f"\n[x BACKUP] Auto-generating backup for User {user_id}...")
 
             # In prod: Zip DB and email it
 
@@ -3073,6 +3437,108 @@ def guest_request():
 
     return jsonify({'success': False, 'message': 'Booking not found'})
 
+@app.route('/api/guest/edit-details/<int:booking_id>', methods=['GET'])
+def get_booking_details_edit(booking_id):
+    """Fetch current guest booking details for edit form"""
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("""SELECT b.id, b.guest_name, b.phone, b.address, b.id_number, b.room_id, b.members 
+                 FROM bookings b WHERE b.id = ?""", (booking_id,))
+    row = c.fetchone()
+    conn.close()
+    
+    if not row:
+        return jsonify({'success': False, 'message': 'Booking not found'})
+    
+    # Parse members to extract second guest name if available
+    second_guest_name = ''
+    if row[6]:
+        try:
+            import json
+            members = json.loads(row[6])
+            if members and len(members) > 0:
+                second_guest_name = members[0].get('name', '')
+        except:
+            pass
+    
+    return jsonify({
+        'success': True,
+        'id': row[0],
+        'guest_name': row[1],
+        'phone': row[2],
+        'address': row[3],
+        'id_number': row[4],
+        'room': row[5],
+        'second_guest_name': second_guest_name
+    })
+
+@app.route('/api/guest/update-details', methods=['POST'])
+def update_guest_details():
+    """Update guest booking details"""
+    booking_id = request.form.get('booking_id')
+    guest_name = request.form.get('guest_name')
+    second_guest_name = request.form.get('second_guest_name')
+    phone = request.form.get('phone')
+    address = request.form.get('address')
+    id_number = request.form.get('id_number')
+    room = request.form.get('room')
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # Verify booking exists
+    c.execute("SELECT id, hotel_id FROM bookings WHERE id = ?", (booking_id,))
+    booking = c.fetchone()
+    
+    if not booking:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Booking not found'})
+    
+    hotel_id = booking[1]
+    
+    # Handle photo upload if provided
+    id_photo = None
+    if 'id_photo' in request.files:
+        file = request.files['id_photo']
+        if file and file.filename:
+            id_photo = save_uploaded_file(file, prefix='id')
+    
+    # Update booking details
+    update_query = """UPDATE bookings SET 
+                      guest_name = ?, 
+                      phone = ?, 
+                      address = ?, 
+                      id_number = ?"""
+    params = [guest_name, phone, address, id_number]
+    
+    if id_photo:
+        update_query += ", id_photo = ?"
+        params.append(id_photo)
+    
+    update_query += " WHERE id = ?"
+    params.append(booking_id)
+    
+    c.execute(update_query, params)
+    
+    # Update members if second guest name provided
+    if second_guest_name:
+        import json
+        members = [{'name': second_guest_name}]
+        c.execute("UPDATE bookings SET members = ? WHERE id = ?", 
+                 (json.dumps(members), booking_id))
+    
+    # Update room if changed
+    if room:
+        c.execute("UPDATE bookings SET room_id = ? WHERE id = ?", (room, booking_id))
+    
+    conn.commit()
+    conn.close()
+    
+    # Log the update
+    log_action(0, 'GUEST_UPDATE', f"Guest {guest_name} updated booking {booking_id}", hotel_id)
+    
+    return jsonify({'success': True, 'message': 'Details updated successfully'})
+
 # --- Guest Self Check-in Portal ---
 
 @app.route('/guest-checkin/<token>')
@@ -3090,6 +3556,7 @@ def guest_checkin_page(token):
     return render_template('guest_checkin_form.html', hotel_id=hotel[0], hotel_name=hotel[1], token=token)
 
 @app.route('/api/guest/self-checkin', methods=['POST'])
+
 def guest_self_checkin():
     """Public API: guest submits their details (multipart form for photo upload)."""
     hotel_id = request.form.get('hotel_id')
@@ -3102,16 +3569,37 @@ def guest_self_checkin():
     if not all([hotel_id, guest_name, phone, address]):
         return jsonify({'success': False, 'message': 'All fields are required / सभी जानकारी आवश्यक है'})
     
-    # Save ID photo if uploaded
-    id_photo_path = None
-    if 'id_photo' in request.files and request.files['id_photo'].filename:
-        file = request.files['id_photo']
-        filename = secure_filename(f"selfcheckin_h{hotel_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.filename}")
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        id_photo_path = f"uploads/{filename}"
+    # Process primary ID photo and member photos
+    id_photo_paths = []
+    
+    if 'id_photo' in request.files:
+        files = request.files.getlist('id_photo')
+        for file in files:
+            rel_path = save_uploaded_file(file, prefix=f"selfcheckin_h{hotel_id}")
+            if rel_path:
+                id_photo_paths.append(rel_path)
+        
+    import json
+    try:
+        members_data = json.loads(members)
+    except:
+        members_data = []
+        
+    for key in request.files:
+        if key.startswith('member_photo_'):
+            for file in request.files.getlist(key):
+                rel_path = save_uploaded_file(file, prefix=f"selfcheckin_mem_h{hotel_id}")
+                if rel_path:
+                    id_photo_paths.append(rel_path)
+
+    if len(members_data) == 0:
+        if len(id_photo_paths) < 1:
+            return jsonify({'success': False, 'message': 'ID Photo is compulsory for primary guest'})
     else:
-        return jsonify({'success': False, 'message': 'ID Photo is compulsory / पहचान पत्र फोटो अनिवार्य है'})
+        if len(id_photo_paths) < 2:
+            return jsonify({'success': False, 'message': 'Minimum 2 ID photos required when there are multiple guests'})
+
+    id_photo_path = ','.join(id_photo_paths)
     
     conn = get_db_connection()
     c = conn.cursor()
@@ -3241,7 +3729,7 @@ def portal_qr_data():
     if not row or not row[0]:
         return jsonify({'success': False, 'message': 'Token not found'})
     
-    # Build the URL (works both locally and on VPS)
+    # Build the URL using the server's address
     base_url = request.host_url.rstrip('/')
     portal_url = f"{base_url}/guest-checkin/{row[0]}"
     
@@ -3308,6 +3796,7 @@ def serve_sw():
     response = make_response(send_from_directory('static', 'sw.js'))
     response.headers['Content-Type'] = 'application/javascript'
     response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     return response
 
 if __name__ == '__main__':
@@ -3318,5 +3807,4 @@ if __name__ == '__main__':
 
     # Run the app
 
-    app.run(debug=True, host='0.0.0.0', port=5000)
-
+    app.run(debug=False, host='0.0.0.0', port=5000)

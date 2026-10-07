@@ -271,6 +271,8 @@
         async function loadBill() {
             const response = await fetch(`/api/guest/${guestId}`);
             const guest = await response.json();
+            const memberNames = Array.isArray(guest.members) ? guest.members : [];
+            const allNames = [guest.guest_name, ...memberNames].join('<br>');
 
             // Load guest info
             document.getElementById('billInfo').innerHTML = `
@@ -278,7 +280,7 @@
                     <h3>Guest Information</h3>
                     <div class="info-item">
                         <span class="info-label">Name:</span>
-                        <span class="info-value">${guest.guest_name}</span>
+                        <span class="info-value">${allNames}</span>
                     </div>
                     <div class="info-item">
                         <span class="info-label">Phone:</span>

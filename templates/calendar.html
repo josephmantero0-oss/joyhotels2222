@@ -9,15 +9,18 @@
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
     <style>
         :root {
-            --bg-body: #0f172a;
-            --bg-card: #1e293b;
-            --bg-sidebar: #1e293b;
+            --bg-body: #0b0f19;
+            --bg-card: #151c2c;
+            --bg-modal: #182032;
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
-            --primary-color: #6366f1;
-            --success-color: #10b981;
-            --danger-color: #ef4444;
-            --border-color: #334155;
+            --primary-color: #d4af37;
+            --primary-hover: #b8860b;
+            --accent-green: #10b981;
+            --accent-amber: #d97706;
+            --accent-red: #ef4444;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-gold: rgba(212, 175, 55, 0.25);
         }
 
         body {
@@ -29,12 +32,11 @@
             overflow: hidden;
         }
 
-        /* Layout */
+        /* Header */
         .top-header {
             background: var(--bg-card);
-            border-bottom: 0px solid var(--border-color);
-            /* Removed border for seamless look */
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         }
 
         .nav-btn {
@@ -42,9 +44,9 @@
             border: none;
             color: var(--text-secondary);
             padding: 8px 16px;
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
-            font-weight: 500;
+            font-weight: 600;
             transition: all 0.2s;
             text-decoration: none;
             font-size: 0.9rem;
@@ -52,168 +54,22 @@
 
         .nav-btn:hover,
         .nav-btn.active {
-            background: rgba(99, 102, 241, 0.1);
+            background: rgba(212, 175, 55, 0.12);
             color: var(--primary-color);
         }
 
         .control-bar {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
+            border-radius: 16px;
             padding: 1rem 1.5rem;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        @media (max-width: 1024px) {
-            .control-bar {
-                flex-direction: column;
-                gap: 1.5rem;
-                align-items: stretch;
-            }
-
-            .top-header {
-                padding: 1rem;
-                flex-direction: column;
-                gap: 1rem;
-            }
-
-            .header-nav {
-                width: 100%;
-                overflow-x: auto;
-                padding-bottom: 5px;
-            }
-        }
-
-        .brand h2 {
-            margin: 0 0 2rem 0;
-            font-size: 1.5rem;
-            letter-spacing: -0.5px;
-            color: var(--primary-color);
-        }
-
-        .filter-section {
-            margin-bottom: 2.5rem;
-        }
-
-        .filter-section h3 {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-secondary);
-            margin-bottom: 1rem;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 0.8rem;
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-        }
-
-        .dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-
-        /* Main Content */
-        .main-content {
-            padding: 2rem;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        #calendar-wrapper {
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 20px;
-            height: 100%;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-
-        /* FullCalendar Customization */
-        .fc {
-            --fc-border-color: var(--border-color);
-            --fc-page-bg-color: var(--bg-card);
-            --fc-neutral-bg-color: rgba(255, 255, 255, 0.05);
-        }
-
-        .fc-theme-standard td,
-        .fc-theme-standard th {
-            border-color: var(--border-color);
-        }
-
-        .fc-col-header-cell {
-            padding: 10px 0;
-            background: rgba(255, 255, 255, 0.02);
-        }
-
-        .fc-daygrid-day-number {
-            color: var(--text-secondary);
-            text-decoration: none;
-        }
-
-        .fc-toolbar-title {
-            font-size: 1.25rem !important;
-        }
-
-        .fc-button-primary {
-            background-color: var(--primary-color) !important;
-            border: none !important;
-            border-radius: 6px !important;
-            text-transform: capitalize;
-            padding: 6px 16px !important;
-        }
-
-        .fc-button-active {
-            background-color: #4f46e5 !important;
-        }
-
-        /* Buttons */
-        .btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            border: none;
-            font-weight: 500;
-            transition: all 0.2s;
-            text-decoration: none;
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .btn-primary {
-            background: var(--primary-color);
-            color: white;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
-        }
-
-        .btn-outline {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-        }
-
-        .btn-outline:hover {
-            border-color: var(--text-primary);
-            color: var(--text-primary);
-        }
-
-        /* Modal */
+        /* Modal Dialog matching user reference */
         .modal {
             display: none;
             position: fixed;
@@ -221,11 +77,11 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.75);
             z-index: 1000;
             align-items: center;
             justify-content: center;
-            backdrop-filter: blur(4px);
+            backdrop-filter: blur(8px);
         }
 
         .modal.show {
@@ -233,19 +89,101 @@
         }
 
         .modal-content {
-            background: var(--bg-card);
-            padding: 2.5rem;
-            border-radius: 16px;
-            width: 450px;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            background: var(--bg-modal);
+            padding: 2.25rem;
+            border-radius: 20px;
+            width: 480px;
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
         }
 
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
+        .modal-header h2 {
+            margin: 0 0 4px 0;
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.3px;
+        }
+
+        .modal-header p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #94a3b8;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 14px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            color: #f8fafc;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+        }
+
+        /* Save Booking Button matching user screenshot */
+        .btn-gold-submit {
+            background: linear-gradient(135deg, #d4af37, #b8860b);
+            color: #0f172a;
+            font-weight: 800;
+            padding: 12px 24px;
+            border-radius: 9999px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+        }
+
+        .btn-gold-submit:hover {
+            background: linear-gradient(135deg, #f3e5ab, #d4af37);
+            transform: translateY(-1px);
+        }
+
+        .btn-cancel {
+            background: rgba(255, 255, 255, 0.05);
+            color: #cbd5e1;
+            font-weight: 600;
+            padding: 12px 24px;
+            border-radius: 9999px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+
+        .btn-cancel:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
         }
 
         .modal-header h2 {
@@ -384,32 +322,41 @@
     <div class="main-container"
         style="padding: 2rem; display: flex; flex-direction: column; height: calc(100vh - 70px);">
 
-        <!-- Control Bar (New Home for Sidebar Items) -->
+        <!-- Control Bar -->
         <div class="control-bar"
-            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; background: var(--bg-card); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; background: var(--bg-card); padding: 1.25rem 1.75rem; border-radius: 18px; border: 1px solid rgba(255,255,255,0.08);">
             <div style="display: flex; align-items: center; gap: 2rem;">
-                <!-- Legend -->
-                <div style="display: flex; gap: 1rem; align-items: center;">
-                    <span
-                        style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Legend:</span>
-                    <div class="legend-item" style="margin:0;"><span class="dot" style="background: #3b82f6;"></span>
-                        Reserved</div>
-                    <div class="legend-item" style="margin:0;"><span class="dot" style="background: #f59e0b;"></span>
-                        Active</div>
-                    <div class="legend-item" style="margin:0;"><span class="dot" style="background: #10b981;"></span>
-                        Completed</div>
+                <div style="font-size: 1.2rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 10px;">
+                    <span style="width: 32px; height: 32px; background: rgba(212, 175, 55, 0.15); border: 1px solid var(--primary-color); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--primary-color); font-size: 0.9rem;">R</span>
+                    The Registry <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px;">Reservations Board</span>
+                </div>
+                
+                <!-- Status Legend Pills -->
+                <div style="display: flex; gap: 1.25rem; align-items: center; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 1.5rem;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #cbd5e1; font-weight: 500;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #d97706;"></span> Confirmed
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #cbd5e1; font-weight: 500;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span> Checked in
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #cbd5e1; font-weight: 500;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #e11d48;"></span> Pending
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #cbd5e1; font-weight: 500;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #64748b;"></span> Blocked / maintenance
+                    </div>
                 </div>
             </div>
 
-            <div style="display: flex; gap: 1rem; align-items: center;">
+            <div style="display: flex; gap: 1.25rem; align-items: center;">
                 <label class="toggle-option" style="margin:0;">
                     <input type="checkbox" id="showHistory" onchange="toggleHistory(this)">
-                    <span class="toggle-slider" style="height: 24px; width: 44px;"></span>
-                    <span class="toggle-label">Show History</span>
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label" style="font-weight: 500; font-size: 0.9rem;">Show History</span>
                 </label>
-                <button class="btn btn-primary"
+                <button class="btn-gold-submit" style="padding: 10px 22px; font-size: 0.9rem;"
                     onclick="document.getElementById('reservationModal').classList.add('show')">
-                    + New Reservation
+                    + New booking
                 </button>
             </div>
         </div>
@@ -423,45 +370,63 @@
     <!-- New Reservation Modal -->
     <div id="reservationModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2>New Reservation</h2>
+            <div class="modal-header" style="margin-bottom: 1.5rem;">
+                <div>
+                    <h2>New booking</h2>
+                    <p>Add a reservation to the board</p>
+                </div>
                 <button type="button" class="close-btn"
                     onclick="document.getElementById('reservationModal').classList.remove('show')">&times;</button>
             </div>
             <form id="resForm">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Guest Name</label>
-                        <input type="text" name="guest_name" class="form-control" required placeholder="John Doe">
-                    </div>
-                    <div class="form-group">
-                        <label>Phone</label>
-                        <input type="tel" name="phone" class="form-control" required placeholder="+91...">
-                    </div>
-                </div>
-
                 <div class="form-group">
-                    <label>Room Number</label>
+                    <label>ROOM</label>
                     <select name="room_id" id="roomSelect" class="form-control" required>
                         <!-- Loaded dynamically -->
                     </select>
                 </div>
 
+                <div class="form-group">
+                    <label>GUEST NAME</label>
+                    <input type="text" name="guest_name" class="form-control" required placeholder="e.g. Dolma Bhutia">
+                </div>
+
                 <div class="form-grid">
                     <div class="form-group">
-                        <label>Check-in</label>
+                        <label>CHECK-IN</label>
                         <input type="date" name="checkin_date" id="checkinDate" class="form-control" required>
                     </div>
                     <div class="form-group">
-                        <label>Check-out</label>
+                        <label>CHECK-OUT</label>
                         <input type="date" name="checkout_date" id="checkoutDate" class="form-control" required>
                     </div>
                 </div>
 
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-outline"
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>GUESTS</label>
+                        <input type="number" name="guests_count" class="form-control" value="2" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>STATUS</label>
+                        <select name="status" class="form-control">
+                            <option value="confirmed" selected>Confirmed</option>
+                            <option value="checked_in">Checked in</option>
+                            <option value="pending">Pending</option>
+                            <option value="blocked">Blocked / maintenance</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>PHONE</label>
+                    <input type="tel" name="phone" class="form-control" placeholder="Optional">
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 1.5rem;">
+                    <button type="button" class="btn-cancel"
                         onclick="document.getElementById('reservationModal').classList.remove('show')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Confirm Booking</button>
+                    <button type="submit" class="btn-gold-submit">Save booking</button>
                 </div>
             </form>
         </div>

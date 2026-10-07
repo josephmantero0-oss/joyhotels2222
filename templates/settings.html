@@ -6,7 +6,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings - JoyHotels</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v={{ range(1000,9999) | random }}">
+    <script>
+        // Apply saved brand colour immediately so page renders correct colour
+        (function() {
+            var PURPLE = '#a855f7';
+            var hotelId = '{{ session.hotel_id }}';
+            // Migration: if old key stored 'dark'/'light' as a colour, clear it
+            var oldVal = localStorage.getItem('joy_theme_' + hotelId);
+            if (oldVal === 'dark' || oldVal === 'light') {
+                localStorage.setItem('joy_darkmode_' + hotelId, oldVal);
+                localStorage.removeItem('joy_theme_' + hotelId);
+            }
+            var saved = localStorage.getItem('joy_color_' + hotelId) || PURPLE;
+            document.documentElement.style.setProperty('--primary-color', saved);
+            var adj = function(hex, amt) {
+                return '#' + hex.replace(/^#/, '').replace(/../g, function(c) {
+                    return ('0' + Math.min(255, Math.max(0, parseInt(c, 16) + amt)).toString(16)).slice(-2);
+                });
+            };
+            document.documentElement.style.setProperty('--primary-hover', adj(saved, -20));
+        })();
+    </script>
 </head>
 
 <body>
@@ -78,7 +99,7 @@
                 <div>
                     <label style="display: block; margin-bottom: 0.5rem; color: var(--gold);">Primary Brand
                         Color</label>
-                    <input type="color" id="primaryColor" class="form-control" value="#FFD700"
+                    <input type="color" id="primaryColor" class="form-control" value="#a855f7"
                         style="height: 50px; width: 100px; padding: 0;" onchange="updateTheme(this.value)">
                 </div>
                 <div>
@@ -337,13 +358,37 @@
             <!-- Manage Expenses Card -->
             <div class="content-card">
                 <h2>Manage Expenses</h2>
+                <!-- Filter Row -->
+                <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                    <select id="expenseSettingsFilter" class="form-control" style="width: auto;" onchange="onExpenseFilterChange()">
+                        <option value="today">Today</option>
+                        <option value="date">Specific Date</option>
+                        <option value="all">All Time</option>
+                    </select>
+                    <input type="date" id="expenseSettingsDatePicker" class="form-control" style="width: auto; display: none;" onchange="loadExpensesSettings()">
+                </div>
                 <div id="expenseList" style="margin-top: 1rem;">Loading...</div>
+                <div id="expenseLoadMoreContainer" style="margin-top: 1rem; text-align: center; display: none;">
+                    <button class="btn btn-outline btn-sm" id="btnLoadMoreExpenses" onclick="loadMoreExpenses()">Load More</button>
+                </div>
             </div>
 
             <!-- Manage Guests Card -->
             <div class="content-card">
                 <h2>Manage Guest History</h2>
+                <!-- Filter Row -->
+                <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                    <select id="guestSettingsFilter" class="form-control" style="width: auto;" onchange="onGuestFilterChange()">
+                        <option value="today">Today</option>
+                        <option value="date">Specific Date</option>
+                        <option value="all">All Time</option>
+                    </select>
+                    <input type="date" id="guestSettingsDatePicker" class="form-control" style="width: auto; display: none;" onchange="loadGuestsSettings()">
+                </div>
                 <div id="guestList" style="margin-top: 1rem;">Loading...</div>
+                <div id="guestLoadMoreContainer" style="margin-top: 1rem; text-align: center; display: none;">
+                    <button class="btn btn-outline btn-sm" id="btnLoadMoreGuests" onclick="loadMoreGuests()">Load More</button>
+                </div>
             </div>
         </div>
     </div>
@@ -462,36 +507,164 @@
                 document.getElementById('auditList').innerHTML = '<tr><td colspan="5" style="text-align:center; color: red;">Error loading logs</td></tr>';
             }
         }
-        async function loadData() {
-            // Load Expenses
-            const expRes = await fetch('/api/expenses');
-            const expenses = await expRes.json();
-            document.getElementById('expenseList').innerHTML = expenses.length ? `
+        let allExpenses = [];
+        let visibleExpensesCount = 15;
+
+        let allGuests = [];
+        let visibleGuestsCount = 15;
+
+        function onExpenseFilterChange() {
+            const filter = document.getElementById('expenseSettingsFilter').value;
+            const picker = document.getElementById('expenseSettingsDatePicker');
+            if (filter === 'date') {
+                picker.style.display = 'inline-block';
+            } else {
+                picker.style.display = 'none';
+            }
+            loadExpensesSettings();
+        }
+
+        function onGuestFilterChange() {
+            const filter = document.getElementById('guestSettingsFilter').value;
+            const picker = document.getElementById('guestSettingsDatePicker');
+            if (filter === 'date') {
+                picker.style.display = 'inline-block';
+            } else {
+                picker.style.display = 'none';
+            }
+            loadGuestsSettings();
+        }
+
+        async function loadExpensesSettings() {
+            try {
+                const filter = document.getElementById('expenseSettingsFilter').value;
+                let url = '/api/expenses';
+                if (filter === 'today') {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    url += `?date=${todayStr}`;
+                } else if (filter === 'date') {
+                    const selected = document.getElementById('expenseSettingsDatePicker').value;
+                    if (selected) {
+                        url += `?date=${selected}`;
+                    }
+                }
+                const response = await fetch(url);
+                allExpenses = await response.json();
+                visibleExpensesCount = 15;
+                renderExpensesSettings();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('expenseList').innerHTML = '<p style="color: red;">Error loading expenses.</p>';
+            }
+        }
+
+        function renderExpensesSettings() {
+            const list = allExpenses.slice(0, visibleExpensesCount);
+            const container = document.getElementById('expenseList');
+            if (!container) return;
+
+            if (allExpenses.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary);">No expenses found for this selection.</p>';
+                document.getElementById('expenseLoadMoreContainer').style.display = 'none';
+                return;
+            }
+
+            container.innerHTML = `
                 <table>
                     <thead><tr><th>Name</th><th>Amount</th><th>Action</th></tr></thead>
-                    <tbody>${expenses.map(e => `
+                    <tbody>${list.map(e => `
                         <tr>
                             <td>${e.name}</td>
                             <td>₹${e.amount}</td>
                             <td><button class="btn btn-danger btn-sm" onclick="deleteExpense(${e.id})">Delete</button></td>
                         </tr>`).join('')}
                     </tbody>
-                </table>` : '<p style="color: var(--text-secondary);">No expenses found.</p>';
+                </table>`;
 
-            // Load Guests
-            const guestRes = await fetch('/api/guests');
-            const guests = await guestRes.json();
-            document.getElementById('guestList').innerHTML = guests.length ? `
+            const loadMore = document.getElementById('expenseLoadMoreContainer');
+            if (allExpenses.length > visibleExpensesCount) {
+                loadMore.style.display = 'block';
+            } else {
+                loadMore.style.display = 'none';
+            }
+        }
+
+        function loadMoreExpenses() {
+            visibleExpensesCount += 15;
+            renderExpensesSettings();
+        }
+
+        async function loadGuestsSettings() {
+            try {
+                const filter = document.getElementById('guestSettingsFilter').value;
+                let url = '/api/guests';
+                if (filter === 'today') {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    url += `?date=${todayStr}`;
+                } else if (filter === 'date') {
+                    const selected = document.getElementById('guestSettingsDatePicker').value;
+                    if (selected) {
+                        url += `?date=${selected}`;
+                    }
+                }
+                const response = await fetch(url);
+                allGuests = await response.json();
+                visibleGuestsCount = 15;
+                renderGuestsSettings();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('guestList').innerHTML = '<p style="color: red;">Error loading guest history.</p>';
+            }
+        }
+
+        function renderGuestsSettings() {
+            const list = allGuests.slice(0, visibleGuestsCount);
+            const container = document.getElementById('guestList');
+            if (!container) return;
+
+            if (allGuests.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary);">No guest history found for this selection.</p>';
+                document.getElementById('guestLoadMoreContainer').style.display = 'none';
+                return;
+            }
+
+            container.innerHTML = `
                 <table>
                     <thead><tr><th>Guest</th><th>Room</th><th>Action</th></tr></thead>
-                    <tbody>${guests.map(g => `
+                    <tbody>${list.map(g => `
                         <tr>
-                            <td>${g.guest_name}</td>
+                            <td>
+                                ${g.guest_name}
+                                ${g.members && g.members.length ? `<br>${g.members.join('<br>')}` : ''}
+                            </td>
                             <td>${g.room_id}</td>
                             <td><button class="btn btn-danger btn-sm" onclick="deleteGuest(${g.id})">Delete</button></td>
                         </tr>`).join('')}
                     </tbody>
-                </table>` : '<p style="color: var(--text-secondary);">No guest history found.</p>';
+                </table>`;
+
+            const loadMore = document.getElementById('guestLoadMoreContainer');
+            if (allGuests.length > visibleGuestsCount) {
+                loadMore.style.display = 'block';
+            } else {
+                loadMore.style.display = 'none';
+            }
+        }
+
+        function loadMoreGuests() {
+            visibleGuestsCount += 15;
+            renderGuestsSettings();
+        }
+
+        async function loadData() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const expPicker = document.getElementById('expenseSettingsDatePicker');
+            const guestPicker = document.getElementById('guestSettingsDatePicker');
+            if (expPicker && !expPicker.value) expPicker.value = todayStr;
+            if (guestPicker && !guestPicker.value) guestPicker.value = todayStr;
+
+            await loadExpensesSettings();
+            await loadGuestsSettings();
 
             // Load Staff
             {% if session.role == 'owner' %}
@@ -674,13 +847,15 @@
 
         function saveTheme() {
             const color = document.getElementById('primaryColor').value;
-            localStorage.setItem('joy_theme_{{ session.hotel_id }}', color);
-            alert('Theme saved! It will apply for this account.');
+            localStorage.setItem('joy_color_{{ session.hotel_id }}', color);
+            alert('Theme saved! It will apply across your account.');
         }
 
         function resetTheme() {
-            localStorage.removeItem('joy_theme_{{ session.hotel_id }}');
-            window.location.reload();
+            const DEFAULT = '#a855f7';
+            localStorage.removeItem('joy_color_{{ session.hotel_id }}');
+            document.getElementById('primaryColor').value = DEFAULT;
+            updateTheme(DEFAULT);
         }
 
         // Helper to darken color
@@ -688,16 +863,11 @@
             return '#' + color.replace(/^#/, '').replace(/../g, color => ('0' + Math.min(255, Math.max(0, parseInt(color, 16) + amount)).toString(16)).substr(-2));
         }
 
-        // Load saved theme
-        const savedColor = localStorage.getItem('joy_theme_{{ session.hotel_id }}');
-        if (savedColor) {
-            document.getElementById('primaryColor').value = savedColor;
-            updateTheme(savedColor);
-        } else {
-            // Apply default Yellow theme to the page preview
-            document.getElementById('primaryColor').value = '#FFD700';
-            updateTheme('#FFD700');
-        }
+        // Load saved colour (or default to light purple)
+        const DEFAULT_COLOR = '#a855f7';
+        const savedColor = localStorage.getItem('joy_color_{{ session.hotel_id }}') || DEFAULT_COLOR;
+        document.getElementById('primaryColor').value = savedColor;
+        updateTheme(savedColor);
 
         // Financial Settings Logic
         const savedCurrency = "{{ currency }}";
