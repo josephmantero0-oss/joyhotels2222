@@ -467,6 +467,29 @@ def trigger_backup():
         return jsonify({'success': False, 'message': f"Failed to send email: {message}"})
 
 # Routes
+@app.route('/debug_db')
+def debug_db():
+    import json as _json
+    info = {
+        'db_path': DB_PATH,
+        'db_exists': os.path.exists(DB_PATH),
+        'bundled_db': os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hotel.db'),
+        'bundled_exists': os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hotel.db')),
+        'is_vercel': bool(IS_VERCEL),
+        'hotels': [],
+    }
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id, name FROM hotels")
+        info['hotels'] = [{'id': r[0], 'name': r[1]} for r in c.fetchall()]
+        c.execute("SELECT COUNT(*) FROM bookings WHERE hotel_id=10")
+        info['najuka_bookings'] = c.fetchone()[0]
+        conn.close()
+    except Exception as e:
+        info['error'] = str(e)
+    return _json.dumps(info, indent=2), 200, {'Content-Type': 'application/json'}
+
 @app.route('/')
 def index():
     if 'logged_in' in session:
